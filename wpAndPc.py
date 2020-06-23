@@ -6,6 +6,18 @@ import pandas as pd
 import pyarrow as pa
 path = str(os.path.dirname(os.path.realpath(__file__)))
 
+class dataRow:
+    def __init__(self,seriesID, year, period, surveyAbbr, industry_code, product_code, seasonal, timePeriod):
+        self.seriesID = seriesID
+        self.year = year
+        self.period = period
+        self.surveyAbbr = surveyAbbr
+        self.industry_code = industry_code
+        self.product_code = product_code
+        self.seasonal = seasonal
+        self.timePeriod = timePeriod
+"Time Period (YYYY-MM-01)"
+
 
 def checkForLatestVersion():
     print("Choose an option:")
