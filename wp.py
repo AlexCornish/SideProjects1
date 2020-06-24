@@ -21,19 +21,16 @@ class dataRow:
     def __str__(self):
         return "Test: Series_ID:%s Year:%s Period:%s" % (self.seriesID,self.year,self.period)
 
+class labelStorage:
+    def __init__(self, item_name, item_Dict):
+        self.item_name = item_name
+        self.item_Dict = item_Dict
+
 def checkForLatestVersion():
-    print("Choose an option:")
-    print("1: pc        (Industry)")
-    print("2: wp        (Commodity)")
-    wpORpc = str(input("Type either pc or wp: "))
-    if wpORpc == "pc":
-        BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("pcCur","Current")
-    elif wpORpc == "wp":
-        BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
+    BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
 
 def readParquet(fileName):
-    tempDF = pq.read_table(fileName).to_pandas()
-    return tempDF
+    return pq.read_table(fileName).to_pandas()
 
 def writeToCSV(fileName,data):
     tempName = fileName[:-8] + ".csv"
@@ -43,8 +40,7 @@ def writeToCSV(fileName,data):
 
 def formatTimePeriod(year,monthPeriod):
     # This should be formatted yyyy-mm-01
-    formattedTime = year + "-" + monthPeriod[1:] + "-01"
-    return formattedTime
+    return year + "-" + monthPeriod[1:] + "-01"
 
 def createCustomFormattedDataFrame(dataFrame, wpORpc):
     columnTitlesSet = False
@@ -53,17 +49,21 @@ def createCustomFormattedDataFrame(dataFrame, wpORpc):
     timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
     m13Drop = int(input("Would you like to drop all M13 periods?: "))
     labelAdd = int(input("Would you like to add labels for each level?: "))
+    indCom = {}
     if labelAdd == 1:
-        filePart = wpORpc[:2] + "LRef"
-        newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName(filePart,BLS_Request.getAllFilesInDirectory(filePart))
+        newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("wpLRef",BLS_Request.getAllFilesInDirectory("wpLRef"))
         newDataFrame = readParquet(newPath)
         newDfList = newDataFrame.values.tolist()
-        indCom = {}
         for row in newDfList:
             if row[1] == "-":
-                indCom[row[0]] = row[2]
-        print(indCom)
-
+                indCom[row[0]] = labelStorage(row[2],{})
+            else:
+                if row[0] not in indCom:
+                    indCom[row[0]] = labelStorage(row[2],{})
+                else:
+                    indCom.get(row[0]).item_Dict[row[1]] = row[2]
+        #for j in indCom.get("01").item_Dict:
+            #print(indCom.get("01").item_Dict[j])
     codeSplit = int(input("Would you like to split all the id codes?: "))
     seasonColumn = int(input("Would you like to add a column for seasonal codes?: "))
     dfList = dataFrame.values.tolist()
@@ -85,17 +85,11 @@ def createCustomFormattedDataFrame(dataFrame, wpORpc):
             newRow.seasonal = newRow.seriesID[2:3]
         #elif m13Drop == 1:
     #______________Splitting the ID code__________________________
-    print(newDataFrame)
+
     return newDataFrame
              
-#checkForLatestVersion()
-print("Choose an option:")
-print("1: pc        (Industry)")
-print("2: wp        (Commodity)")
-wpORpc = str(input("Type either pc or wp: ")) + "Cur"
-BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion(wpORpc,"Current")
-newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName(wpORpc,BLS_Request.getAllFilesInDirectory(wpORpc))
-#print(BLS_Request.checkForIndustryOrCommodity(wpORpc, newPath))
+BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
+newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("wpCur",BLS_Request.getAllFilesInDirectory("wpCur"))
 dataFrame = readParquet(newPath)
-data = createCustomFormattedDataFrame(dataFrame, wpORpc)
+data = createCustomFormattedDataFrame(dataFrame, "wpCur")
 writeToCSV(newPath,data)

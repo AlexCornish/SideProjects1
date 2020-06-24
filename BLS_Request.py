@@ -138,6 +138,27 @@ def convertRawDataTOPyArrowFormat(rawData, wpOrpc, newVerDateTime):
     table = pa.Table.from_pandas(df)
     pq.write_table(table,tempName)
 
+def getLatestVersionFileName(wpOrpc,filesInDirectory):
+    latestTime = datetime.time()
+    latestName = ""
+    latestDate = datetime.date.fromtimestamp(0)
+    for fileName in filesInDirectory:
+        date, time = extractTimeFromFileName(fileName)
+        if date > latestDate:
+            latestDate = date
+            latestName = fileName
+            latestTime = time
+
+
+    if wpOrpc == "pcCur":
+        return "Industry\\" + fileName
+    elif wpOrpc == "wpCur":
+        return "Commodity\\" + fileName
+    elif wpOrpc == "pcLRef":
+        return "Industry\\Labels\\" + fileName
+    elif wpOrpc == "wpLRef":
+        return "Commodity\\Labels\\" + fileName
+
 def createFileName(latestVersionDate,wpOrpc):
     # wp (commodity) and pc (industry)
     dateStr = str(latestVersionDate[0]) + "-" + str(latestVersionDate[1])
