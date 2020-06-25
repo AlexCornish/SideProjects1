@@ -7,7 +7,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import os
 import time
-
+ 
 path = str(os.path.dirname(os.path.realpath(__file__))) 
 BLS_BASE_URL = "https://download.bls.gov/pub/time.series/"
 urlDict = {
