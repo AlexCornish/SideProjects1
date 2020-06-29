@@ -1,15 +1,18 @@
 import BLS_Request
 import os
 import pyarrow.parquet as pq
+import pandas as pd
 import csv
 path = str(os.path.dirname(os.path.realpath(__file__)))
+quartersArr = ["M01M02M03","M04M05M06","M07M08M09","M10M11M12"]
 
 class dataRow:
-    def __init__(self,seriesID, year, period, value, surveyAbbr, group_code, group_name, item_code, item_name, seasonal, timePeriod):
+    def __init__(self,seriesID, year, period, value, qrtpercentageChange,surveyAbbr, group_code, group_name, item_code, item_name, seasonal, timePeriod):
         self.seriesID = seriesID # The full code that comes as default in both of the Current files. Usually looks like PCU1133--1133
         self.year = year # The year of the report.
         self.period = period # The month the report came out, usually in MXX format, with XX being the number of the month.
         self.value = value
+        self.qrtpercentageChange = qrtpercentageChange
         self.surveyAbbr = surveyAbbr # The first two letters of series ID that indicates if it is industry (pc) or commodity (wp) data.
         self.seasonal = seasonal # A single letter, either 'S' and 'U' that indicates whether it is seasonally adjusted (S) or not seasonally adjusted (U).
         self.group_code = group_code # The first 6 numbers of the seriesID after the seasonal indicator, represents industry or group that the product or item belongs to.
@@ -26,6 +29,15 @@ class labelStorage:
         self.item_Dict = item_Dict
     def __str__(self):
         return "Test: Item Name:%s Dict:%s" % (self.item_name,self.item_Dict)
+
+class quarters:
+    def __init__(self, q1, q2, q3, q4):
+        self.q1 = q1
+        self.q2 = q2
+        self.q3 = q3
+        self.q4 = q4
+    def __str__(self):
+        return "Q1:%s Q2:%s Q3:%s Q4:%s" % (self.q1,self.q2,self.q3,self.q4)
 
 def checkForLatestVersion():
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
@@ -44,15 +56,61 @@ def formatTimePeriod(year,monthPeriod):
     # This should be formatted yyyy-mm-01
     return year + "-" + monthPeriod[1:] + "-01"
 
+def quarteriseDataFrame(dataFrame):
+    newDF = []
+    dfList = dataFrame.values.tolist()
+    iterList = iter(dfList)
+    next(iterList)
+    quarterDict = {}
+    for j in iterList:
+        newRowQrt = dataRow(j[0],j[1],j[2],j[3],"","","","","","","","")
+        if newRowQrt.seriesID not in quarterDict:
+            quarterDict[newRowQrt.seriesID] = {}
+        if newRowQrt.year not in quarterDict[newRowQrt.seriesID]:
+            quarterDict[newRowQrt.seriesID][newRowQrt.year] = quarters([],[],[],[])
+        for m in range(0,len(quartersArr)):
+            if newRowQrt.period in quartersArr[m]:
+                if m == 0:
+                    quarterDict[newRowQrt.seriesID][newRowQrt.year].q1.append(float(newRowQrt.value))
+                elif m == 1:
+                    quarterDict[newRowQrt.seriesID][newRowQrt.year].q2.append(float(newRowQrt.value))
+                elif m == 2:
+                    quarterDict[newRowQrt.seriesID][newRowQrt.year].q3.append(float(newRowQrt.value))
+                elif m == 3:
+                    quarterDict[newRowQrt.seriesID][newRowQrt.year].q4.append(float(newRowQrt.value))
+    for x in quarterDict:
+        for k in quarterDict[x]:
+            newDF.append([x,k,"Q1",arrayAvg(quarterDict[x][k].q1),"","","","","","","",""])
+            newDF.append([x,k,"Q2",arrayAvg(quarterDict[x][k].q2),"","","","","","","",""])
+            newDF.append([x,k,"Q3",arrayAvg(quarterDict[x][k].q3),"","","","","","","",""])
+            newDF.append([x,k,"Q4",arrayAvg(quarterDict[x][k].q4),"","","","","","","",""])
+    return newDF
+
+def arrayAvg(arr):
+    if len(arr) == 0:
+        return "-"
+    return round(sum(arr)/len(arr),2)
+
 def createCustomFormattedDataFrame(dataFrame):
     columnTitlesSet = False
     newDataFrame = []
     outputFrame = []
+    dfList = dataFrame.values.tolist()
+    titleRow = dataRow("seriesID","year","period","value","","","","","","","","")
+
     print("For each of these options type 0 for yes or 1 for no:")
-    timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
-    m13Drop = int(input("Would you like to drop all M13 periods?: "))
+    avgOverQrt = int(input("Would you like the values averaged over quarters?: "))
+    if avgOverQrt == 1:
+        dfList = quarteriseDataFrame(dataFrame)
+        titleRow.timePeriod = "quarter"
+        titleRow.value = "quarterly average value"
+    else:
+        timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
+        m13Drop = int(input("Would you like to drop all M13 periods?: "))
+    
     labelAdd = int(input("Would you like to add labels for each level?: "))
     indCom = {}
+    #___________________________________Label creation______________________________________
     if labelAdd == 1:
         newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("wpLRef",BLS_Request.getAllFilesInDirectory("wpLRef"))
         newDataFrame = readParquet(newPath)
@@ -68,18 +126,14 @@ def createCustomFormattedDataFrame(dataFrame):
                     indCom[row[0]] = labelStorage(row[2],{})
                 else:
                     indCom.get(row[0]).item_Dict[row[1]] = row[2]
+
+
     codeSplit = int(input("Would you like to split all the id codes?: "))
     seasonColumn = int(input("Would you like to add a column for seasonal codes?: "))
-    dfList = dataFrame.values.tolist()
     iterList = iter(dfList)
-    titleRow = dataRow("seriesID","year","period","value","","","","","","","")
     next(iterList)
-    for i in iterList:
-        newRow = dataRow(i[0],i[1],i[2],i[3],"","","","","","","")
-        if timeFormat == 1:
-            newRow.timePeriod = formatTimePeriod(newRow.year,newRow.period)
-            if columnTitlesSet == False:
-                titleRow.timePeriod = "timePeriod"
+    for i in iterList: 
+        newRow = dataRow(i[0],i[1],i[2],i[3],"","","","","","","","")
         if labelAdd == 1:
             for i in indCom.keys():
                 if i in newRow.seriesID:
@@ -98,20 +152,30 @@ def createCustomFormattedDataFrame(dataFrame):
                 titleRow.surveyAbbr = "surveyAbbr"
                 titleRow.group_code = "group_code"
                 titleRow.item_code = "item_code"
-        if seasonColumn == 1:
-            newRow.seasonal = newRow.seriesID[2:3]
+            if seasonColumn == 1:
+                newRow.seasonal = newRow.seriesID[2:3]
             if columnTitlesSet == False:
                 titleRow.seasonal = "seasonal"
-        if m13Drop == 1:
-            if newRow.period != "M13":
+        if avgOverQrt == 0:
+            if timeFormat == 1:
+                newRow.timePeriod = formatTimePeriod(newRow.year,newRow.period)
                 if columnTitlesSet == False:
-                    outputFrame.append(str(titleRow))
-                    columnTitlesSet = True
+                    titleRow.timePeriod = "timePeriod"
+            if m13Drop == 1:
+                if newRow.period != "M13":
+                    if columnTitlesSet == False:
+                        outputFrame.append(str(titleRow))
+                        columnTitlesSet = True
+                    outputFrame.append(str(newRow))
+            else:
+                if columnTitlesSet == False:
+                        outputFrame.append(str(titleRow))
+                        columnTitlesSet = True
                 outputFrame.append(str(newRow))
         else:
             if columnTitlesSet == False:
-                    outputFrame.append(str(titleRow))
-                    columnTitlesSet = True
+                outputFrame.append(str(titleRow))
+                columnTitlesSet = True
             outputFrame.append(str(newRow))
     return outputFrame
 
@@ -128,3 +192,5 @@ def wpProcessing():
     dataFrame = readParquet(newPath)
     data = createCustomFormattedDataFrame(dataFrame) 
     writeToCSV(newPath,data)
+
+wpProcessing()
