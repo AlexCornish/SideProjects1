@@ -7,12 +7,12 @@ path = str(os.path.dirname(os.path.realpath(__file__)))
 quartersArr = ["M01M02M03","M04M05M06","M07M08M09","M10M11M12"]
 
 class dataRow:
-    def __init__(self,seriesID, year, period, value, qrtpercentageChange,surveyAbbr, group_code, group_name, item_code, item_name, seasonal, timePeriod):
+    def __init__(self,seriesID, year, period, value, percentageChange,surveyAbbr, group_code, group_name, item_code, item_name, seasonal, timePeriod):
         self.seriesID = seriesID # The full code that comes as default in both of the Current files. Usually looks like PCU1133--1133
         self.year = year # The year of the report.
         self.period = period # The month the report came out, usually in MXX format, with XX being the number of the month.
         self.value = value
-        self.qrtpercentageChange = qrtpercentageChange
+        self.percentageChange = percentageChange
         self.surveyAbbr = surveyAbbr # The first two letters of series ID that indicates if it is industry (pc) or commodity (wp) data.
         self.seasonal = seasonal # A single letter, either 'S' and 'U' that indicates whether it is seasonally adjusted (S) or not seasonally adjusted (U).
         self.group_code = group_code # The first 6 numbers of the seriesID after the seasonal indicator, represents industry or group that the product or item belongs to.
@@ -21,7 +21,7 @@ class dataRow:
         self.item_name = item_name # Name of the product/item that corresponds to the product_item_code.
         self.timePeriod = timePeriod # A formatted publication date, in the format of YYYY-MM-01
     def __str__(self):
-        return "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s" % (self.seriesID,self.year,self.period,self.value,self.surveyAbbr,self.seasonal,self.group_code,self.group_name,self.item_code, self.item_name, self.timePeriod)
+        return "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s" % (self.seriesID,self.year,self.period,self.value,self.surveyAbbr,self.seasonal,self.group_code,self.group_name,self.item_code, self.item_name, self.percentageChange, self.timePeriod)
 
 class labelStorage:
     def __init__(self, item_name, item_Dict):
@@ -49,12 +49,15 @@ def writeToCSV(fileName,data):
     tempName = fileName[:-8] + ".csv"
     with open(tempName,'w',newline='') as newFile:
         wr = csv.writer(newFile,delimiter=',')
-        wr.writerows(formatString(x).split(',') for x in data)
+        wr.writerows(formatString(str(x)).split(',') for x in data)
         newFile.close()
 
 def formatTimePeriod(year,monthPeriod):
     # This should be formatted yyyy-mm-01
     return year + "-" + monthPeriod[1:] + "-01"
+
+def specialRounding(currentNum, previousNum):
+    return round((currentNum-previousNum),1)
 
 def quarteriseDataFrame(dataFrame):
     newDF = []
@@ -91,6 +94,20 @@ def arrayAvg(arr):
         return "-"
     return round(sum(arr)/len(arr),2)
 
+def periodOverPeriodCalculation(dataFrame):
+    print("period over period ")
+    labelDict = []
+    for i in range(0,len(dataFrame)):
+        if dataFrame[i].seriesID not in labelDict:
+            labelDict.append(dataFrame[i].seriesID)
+            dataFrame[i].percentageChange = "-"
+        elif dataFrame[i].value == "-" or dataFrame[i-1].value == "-":
+            dataFrame[i].percentageChange = "-"
+        else:
+            dataFrame[i].percentageChange = specialRounding(float(dataFrame[i].value),float(dataFrame[i-1].value))
+    return dataFrame
+        
+
 def createCustomFormattedDataFrame(dataFrame):
     columnTitlesSet = False
     newDataFrame = []
@@ -102,12 +119,12 @@ def createCustomFormattedDataFrame(dataFrame):
     avgOverQrt = int(input("Would you like the values averaged over quarters?: "))
     if avgOverQrt == 1:
         dfList = quarteriseDataFrame(dataFrame)
-        titleRow.timePeriod = "quarter"
+        titleRow.period = "quarter"
         titleRow.value = "quarterly average value"
     else:
         timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
         m13Drop = int(input("Would you like to drop all M13 periods?: "))
-    
+    percentageChg = int(input("Would you like to add the percentage change between periods?: "))
     labelAdd = int(input("Would you like to add labels for each level?: "))
     indCom = {}
     #___________________________________Label creation______________________________________
@@ -131,6 +148,7 @@ def createCustomFormattedDataFrame(dataFrame):
     codeSplit = int(input("Would you like to split all the id codes?: "))
     seasonColumn = int(input("Would you like to add a column for seasonal codes?: "))
     iterList = iter(dfList)
+    
     next(iterList)
     for i in iterList: 
         newRow = dataRow(i[0],i[1],i[2],i[3],"","","","","","","","")
@@ -164,19 +182,22 @@ def createCustomFormattedDataFrame(dataFrame):
             if m13Drop == 1:
                 if newRow.period != "M13":
                     if columnTitlesSet == False:
-                        outputFrame.append(str(titleRow))
+                        outputFrame.append(titleRow)
                         columnTitlesSet = True
-                    outputFrame.append(str(newRow))
+                    outputFrame.append(newRow)
             else:
                 if columnTitlesSet == False:
-                        outputFrame.append(str(titleRow))
+                        outputFrame.append(titleRow)
                         columnTitlesSet = True
-                outputFrame.append(str(newRow))
+                outputFrame.append(newRow)
         else:
             if columnTitlesSet == False:
-                outputFrame.append(str(titleRow))
+                outputFrame.append(titleRow)
                 columnTitlesSet = True
-            outputFrame.append(str(newRow))
+            outputFrame.append(newRow)
+    if percentageChg == 1:
+        outputFrame = periodOverPeriodCalculation(outputFrame)
+        titleRow.percentageChange = "Percentage Change"
     return outputFrame
 
 def formatString(stringToChange):
