@@ -215,3 +215,4 @@ def wpProcessing():
     writeToCSV(newPath,data)
 
 wpProcessing()
+print("Processing complete")
