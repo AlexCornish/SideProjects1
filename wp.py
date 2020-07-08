@@ -92,7 +92,7 @@ def quarteriseDataFrame(dataFrame):
 def arrayAvg(arr):
     if len(arr) == 0:
         return "-"
-    return round(sum(arr)/len(arr),2)
+    return round(sum(arr)/len(arr),1)
 
 def periodOverPeriodCalculation(dataFrame):
     print("period over period ")
@@ -106,7 +106,24 @@ def periodOverPeriodCalculation(dataFrame):
         else:
             dataFrame[i].percentageChange = specialRounding(float(dataFrame[i].value),float(dataFrame[i-1].value))
     return dataFrame
-        
+
+def yearifyDataFrame(dataFrame):
+    newDF = []
+    dfList = dataFrame.values.tolist()
+    iterList = iter(dfList)
+    next(iterList)
+    yearDict = {}
+    for j in iterList:
+        newRowQrt = dataRow(j[0],j[1],j[2],j[3],"","","","","","","","")
+        if newRowQrt.seriesID not in yearDict:
+            yearDict[newRowQrt.seriesID] = {}
+        if newRowQrt.year not in yearDict[newRowQrt.seriesID]:
+            yearDict[newRowQrt.seriesID][newRowQrt.year] = []
+        yearDict[newRowQrt.seriesID][newRowQrt.year].append(float(newRowQrt.value))
+    for x in yearDict:
+        for k in yearDict[x]:
+            newDF.append([x,k,"",arrayAvg(yearDict[x][k]),"","","","","","","",""])
+    return newDF
 
 def createCustomFormattedDataFrame(dataFrame):
     columnTitlesSet = False
@@ -117,18 +134,28 @@ def createCustomFormattedDataFrame(dataFrame):
 
     print("For each of these options type 0 for yes or 1 for no:")
     avgOverQrt = int(input("Would you like the values averaged over quarters?: "))
+    if avgOverQrt == 0:
+        avgOverYear = int(input("Would you like the values averaged over the years?: "))
+        if avgOverYear == 1:
+            dfList = yearifyDataFrame(dataFrame)
+            titleRow.value = "average year value"
     if avgOverQrt == 1:
         dfList = quarteriseDataFrame(dataFrame)
         titleRow.period = "quarter"
         titleRow.value = "quarterly average value"
-    else:
+    if avgOverYear == 0 and avgOverQrt == 0:
         timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
         m13Drop = int(input("Would you like to drop all M13 periods?: "))
+    
+        
+
     percentageChg = int(input("Would you like to add the percentage change between periods?: "))
     labelAdd = int(input("Would you like to add labels for each level?: "))
     indCom = {}
     #___________________________________Label creation______________________________________
     if labelAdd == 1:
+        print("BLS REQUEST LABELS")
+        BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpLRef","labels")
         newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("wpLRef",BLS_Request.getAllFilesInDirectory("wpLRef"))
         newDataFrame = readParquet(newPath)
         newDfList = newDataFrame.values.tolist()
@@ -143,12 +170,14 @@ def createCustomFormattedDataFrame(dataFrame):
                     indCom[row[0]] = labelStorage(row[2],{})
                 else:
                     indCom.get(row[0]).item_Dict[row[1]] = row[2]
-
-
+    
+    for k in dfList:
+        print(str(k))
+    print(type(dfList))
     codeSplit = int(input("Would you like to split all the id codes?: "))
     seasonColumn = int(input("Would you like to add a column for seasonal codes?: "))
     iterList = iter(dfList)
-    
+    print(type(dfList))
     next(iterList)
     for i in iterList: 
         newRow = dataRow(i[0],i[1],i[2],i[3],"","","","","","","","")
@@ -174,7 +203,7 @@ def createCustomFormattedDataFrame(dataFrame):
                 newRow.seasonal = newRow.seriesID[2:3]
             if columnTitlesSet == False:
                 titleRow.seasonal = "seasonal"
-        if avgOverQrt == 0:
+        if avgOverQrt == 0 and avgOverYear == 0:
             if timeFormat == 1:
                 newRow.timePeriod = formatTimePeriod(newRow.year,newRow.period)
                 if columnTitlesSet == False:
@@ -207,10 +236,21 @@ def formatString(stringToChange):
         stringToChange = stringToChange[:-1]
     return stringToChange
 
+def changeRowHeaders(dataFrame):
+    dfList = dataFrame.values.tolist()
+    for i in range(0,len(dfList[0])):
+        dataFrame = dataFrame.rename(columns = {i:dfList[0][i]})
+    return dataFrame
+
+def formatPeriod(per):
+    return per[1:]
+
 def wpProcessing():
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
     newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("wpCur",BLS_Request.getAllFilesInDirectory("wpCur"))
+    #dataFrame = changeRowHeaders(readParquet(newPath)).drop([0])
     dataFrame = readParquet(newPath)
+    #dataFrame['period'] = dataFrame['period'].apply(formatPeriod)
     data = createCustomFormattedDataFrame(dataFrame) 
     writeToCSV(newPath,data)
 
