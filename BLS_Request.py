@@ -24,6 +24,9 @@ def checkForLatestVersion(wpOrpc,fileNameToCheckFor):
     # wpOrpc: Indicates whether the data to be accessed is from wp (commodity) or pc (industry).
     # Gets the main downloads page from which the time of latest update can be accessed
     URL = BLS_BASE_URL + urlDict[wpOrpc]
+    print("___________________")
+    print(URL)
+    print(fileNameToCheckFor)
     # The URL is selected
     page = requests.get(URL)
     tempString = str(page.text)
@@ -36,15 +39,17 @@ def checkForLatestVersion(wpOrpc,fileNameToCheckFor):
     return convertToDateObj(latestDate)
 
 def pmConverter(dateTimeStr):
+    print("dateTimeStr: " + str(dateTimeStr))
     dateTimeStr = datetime.datetime.strptime(dateTimeStr[:-4], '%m/%d/%Y %H:%M')
     dateTimeStr = dateTimeStr.replace(hour=dateTimeStr.hour+12)
     return dateTimeStr
 
 def convertToDateObj(dateTimeStr):
-        if "PM" in dateTimeStr:
-            return convertFormat(str(pmConverter(dateTimeStr))[:-3])
-        timeStr = str(datetime.datetime.strptime(dateTimeStr[:-4], '%m/%d/%Y %H:%M'))[:-3]
-        return convertFormat(timeStr)
+    print("datetime string: " + str(dateTimeStr))
+    if "PM" in dateTimeStr:
+        return convertFormat(str(pmConverter(dateTimeStr))[:-3])
+    timeStr = str(datetime.datetime.strptime(dateTimeStr[:-4], '%m/%d/%Y %H:%M'))[:-3]
+    return convertFormat(timeStr)
 
 def convertFormat(dateTimeStr):
     dateTimeStr = dateTimeStr.replace(" ","_").replace(":","_").replace("-","_")
@@ -65,22 +70,23 @@ def getBLSData(url, wpOrpc):
   
 def compareLatestOnlineVersionWithLatestDownloadedVersion(wpOrpc,fileNameToCheckFor):
     downloadDate, downloadTime = determineLatestVersionDownloaded(getAllFilesInDirectory(wpOrpc))
-    fileName = checkForLatestVersion(wpOrpc[:2],fileNameToCheckFor).split("_")
-    newVerDate = datetime.date(int(fileName[0]),int(fileName[1]),int(fileName[2]))
-    newVerTime = datetime.time(int(fileName[3]),int(fileName[4]))
-    if newVerDate == downloadDate and newVerTime == downloadTime:
-        print("Latest version is already downloaded.")
-    elif newVerDate > downloadDate:
-        print("Downloading latest version")
-        t0 = time.time()
+    if downloadDate != datetime.date.fromtimestamp(0):
+        fileName = checkForLatestVersion(wpOrpc[:2],urlDict[wpOrpc][3:]).split("_")
+        newVerDate = datetime.date(int(fileName[0]),int(fileName[1]),int(fileName[2]))
+        newVerTime = datetime.time(int(fileName[3]),int(fileName[4]))
+        if newVerDate == downloadDate and newVerTime == downloadTime:
+            print("Latest version is already downloaded.")
+        else:
+            url = BLS_BASE_URL + urlDict[wpOrpc]
+            getAndFormatData(url,wpOrpc,(newVerDate,newVerTime))
+    else:
         url = BLS_BASE_URL + urlDict[wpOrpc]
-        #Figure out what to put here 0.
+        fileName = checkForLatestVersion(wpOrpc[:2],urlDict[wpOrpc][3:]).split("_")
+        newVerDate = datetime.date(int(fileName[0]),int(fileName[1]),int(fileName[2]))
+        newVerTime = datetime.time(int(fileName[3]),int(fileName[4]))
         getAndFormatData(url,wpOrpc,(newVerDate,newVerTime))
-        t1 = time.time()
-        totalTime = t1 - t0
-        print("total time: " + str(totalTime))
 
-def checkForIndustryOrCommodity(wpOrpc, newPath):   
+def checkForIndustryOrCommodity(wpOrpc, newPath): 
     currentPath = ""
     if wpOrpc == "pcCur":
         currentPath = newPath + '\\Industry'
@@ -142,22 +148,23 @@ def getLatestVersionFileName(wpOrpc,filesInDirectory):
     latestTime = datetime.time()
     latestName = ""
     latestDate = datetime.date.fromtimestamp(0)
-    for fileName in filesInDirectory:
-        date, time = extractTimeFromFileName(fileName)
-        if date > latestDate:
-            latestDate = date
-            latestName = fileName
-            latestTime = time
-
-
-    if wpOrpc == "pcCur":
-        return "Industry\\" + fileName
-    elif wpOrpc == "wpCur":
-        return "Commodity\\" + fileName
-    elif wpOrpc == "pcLRef":
-        return "Industry\\Labels\\" + fileName
-    elif wpOrpc == "wpLRef":
-        return "Commodity\\Labels\\" + fileName
+    if len(filesInDirectory) != 0:
+        for fileName in filesInDirectory:
+            date, time = extractTimeFromFileName(fileName)
+            if date > latestDate:
+                latestDate = date
+                latestName = fileName
+                latestTime = time
+        if wpOrpc == "pcCur":
+            return "Industry\\" + fileName
+        elif wpOrpc == "wpCur":
+            return "Commodity\\" + fileName
+        elif wpOrpc == "pcLRef":
+            return "Industry\\Labels\\" + fileName
+        elif wpOrpc == "wpLRef":
+            return "Commodity\\Labels\\" + fileName
+    else:
+        print("help")
 
 def createFileName(latestVersionDate,wpOrpc):
     # wp (commodity) and pc (industry)
