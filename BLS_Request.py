@@ -16,7 +16,8 @@ urlDict = {
     "pcLRef": "pc/pc.product",
     "wp": "wp",
     "wpCur": "wp/wp.data.0.Current",
-    "wpLRef": "wp/wp.item"
+    "wpLRef": "wp/wp.item",
+    "wpGrp": "wp/wp.group"
 }
 
 def checkForLatestVersion(wpOrpc,fileNameToCheckFor):
@@ -24,9 +25,6 @@ def checkForLatestVersion(wpOrpc,fileNameToCheckFor):
     # wpOrpc: Indicates whether the data to be accessed is from wp (commodity) or pc (industry).
     # Gets the main downloads page from which the time of latest update can be accessed
     URL = BLS_BASE_URL + urlDict[wpOrpc]
-    print("___________________")
-    print(URL)
-    print(fileNameToCheckFor)
     # The URL is selected
     page = requests.get(URL)
     tempString = str(page.text)
@@ -39,13 +37,11 @@ def checkForLatestVersion(wpOrpc,fileNameToCheckFor):
     return convertToDateObj(latestDate)
 
 def pmConverter(dateTimeStr):
-    print("dateTimeStr: " + str(dateTimeStr))
     dateTimeStr = datetime.datetime.strptime(dateTimeStr[:-4], '%m/%d/%Y %H:%M')
     dateTimeStr = dateTimeStr.replace(hour=dateTimeStr.hour+12)
     return dateTimeStr
 
 def convertToDateObj(dateTimeStr):
-    print("datetime string: " + str(dateTimeStr))
     if "PM" in dateTimeStr:
         return convertFormat(str(pmConverter(dateTimeStr))[:-3])
     timeStr = str(datetime.datetime.strptime(dateTimeStr[:-4], '%m/%d/%Y %H:%M'))[:-3]
@@ -94,7 +90,7 @@ def checkForIndustryOrCommodity(wpOrpc, newPath):
         currentPath = newPath + '\\Industry\\Labels'
     elif wpOrpc == "wpCur":
         currentPath = newPath + '\\Commodity'
-    elif wpOrpc == "wpLRef":
+    elif wpOrpc == "wpLRef" or wpOrpc == "wpGrp":
         currentPath = newPath + '\\Commodity\\Labels'
     if not os.path.exists(currentPath):
         os.makedirs(currentPath)
@@ -117,6 +113,8 @@ def getAllFilesInDirectory(wpOrpc):
             elif wpOrpc == "pcLRef" and "labels" in file:
                 filesInDirectory.append(file)
             elif wpOrpc == "wpLRef" and "labels" in file:
+                filesInDirectory.append(file)
+            elif wpOrpc == "wpGrp" and "groupLabels" in file:
                 filesInDirectory.append(file)
     return filesInDirectory
 
@@ -163,6 +161,8 @@ def getLatestVersionFileName(wpOrpc,filesInDirectory):
             return "Industry\\Labels\\" + fileName
         elif wpOrpc == "wpLRef":
             return "Commodity\\Labels\\" + fileName
+        elif wpOrpc == "wpGrp":
+            return "Commodity\\Labels\\" + fileName
     else:
         print("help")
 
@@ -178,6 +178,8 @@ def createFileName(latestVersionDate,wpOrpc):
         return "commodity_data_" + latestVersionDate
     elif wpOrpc == "wpLRef":
         return "commodity_labels_" + latestVersionDate
+    elif wpOrpc == "wpGrp":
+        return "commodity_groupLabels_" + latestVersionDate
 
 def getAndFormatData(url,wpOrpc,newVerDateTime):
     newBLSData = getBLSData(url, wpOrpc)
