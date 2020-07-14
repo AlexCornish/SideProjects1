@@ -22,8 +22,6 @@ class dataRow:
         self.item_name = item_name # Name of the product/item that corresponds to the product_item_code.
         self.timePeriod = timePeriod # A formatted publication date, in the format of YYYY-MM-01
         self.yearOverYear = yearOverYear
-    def __str__(self):
-        return "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s" % (self.seriesID,self.year,self.period,self.value,self.surveyAbbr,self.seasonal,self.group_code,self.group_name,self.item_code, self.item_name, self.percentageChange, self.timePeriod,self.yearOverYear)
 
 class quarters:
     def __init__(self, q1, q2, q3, q4):
@@ -31,9 +29,7 @@ class quarters:
         self.q2 = q2
         self.q3 = q3
         self.q4 = q4
-    def __str__(self):
-        return "Q1:%s Q2:%s Q3:%s Q4:%s" % (self.q1,self.q2,self.q3,self.q4)
-
+    
 def checkForLatestVersion():
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
 
@@ -58,7 +54,6 @@ def yearOverYearCalculation(dataFrame,dropM13):
     for j in range(0,len(dfList)):
         newRowQrt = dataRow(dfList[j][0],dfList[j][1],dfList[j][2],dfList[j][3],"","","","","","","","","")
         newDF.append(newRowQrt)
-    print(len(newDF))
     for i in range(0,len(newDF)):
         if newDF[i].seriesID not in labelDict:
             labelDict.append(newDF[i].seriesID)
@@ -118,14 +113,13 @@ def periodOverPeriodCalculation(dataFrame):
         if dfList[row][0] not in labelDict:
             labelDict.append(dfList[row][0])
             percentageColumn.append("X")
-        elif dfList[row][3] == "X" or dfList[row-1][3] == "X":
+        elif dfList[row][dataFrame.columns.get_loc("value")] == "X" or dfList[row-1][dataFrame.columns.get_loc("value")] == "X":
             percentageColumn.append("X")
         else:
-            percentageColumn.append(specialRounding(float(dfList[row][3]),float(dfList[row-1][3])))
+            percentageColumn.append(specialRounding(float(dfList[row][dataFrame.columns.get_loc("value")]),float(dfList[row-1][dataFrame.columns.get_loc("value")])))
     dataFrame.insert((dataFrame.columns.get_loc("value")+1),"percent_change",percentageColumn,True)
     return dataFrame
 
-# Have a look over this. 
 def yearifyDataFrame(dataFrame):
     newDF = []
     dfList = dataFrame.values.tolist()
@@ -140,8 +134,8 @@ def yearifyDataFrame(dataFrame):
         yearDict[newRowQrt.seriesID][newRowQrt.year].append(float(newRowQrt.value))
     for x in yearDict:
         for k in yearDict[x]:
-            newDF.append([x,k,"",arrayAvg(yearDict[x][k])])
-    return pd.DataFrame(newDF, columns=["series_id","year","year","yearly average"])
+            newDF.append([x,k,arrayAvg(yearDict[x][k])])
+    return pd.DataFrame(newDF, columns=["series_id","year","value"])
 
 def createCustomFormattedDataFrame(dataFrame):
     print("For each of these options type 0 for yes or 1 for no:")
@@ -187,12 +181,9 @@ def createCustomFormattedDataFrame(dataFrame):
         dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+2),"item_code",itemCode,True)
         dataFrame = pd.merge(left=dataFrame,right=mergeLeft,how='left',left_on=['group_code','item_code'],right_on=['group_code','item_code'])
         listOfHeaders = list(dataFrame.columns)
-        print(listOfHeaders)
         listOfHeaders[listOfHeaders.index("group_name")] = "item_code"
         listOfHeaders[listOfHeaders.index("item_code")] = "group_name"
-        print(listOfHeaders)
         dataFrame = dataFrame.reindex(columns=listOfHeaders)
-        print(dataFrame)
     elif codeSplit == 1:
         for row in dataFrame.index:
             columnRow = dataFrame["series_id"][row]
@@ -204,10 +195,9 @@ def createCustomFormattedDataFrame(dataFrame):
                 groupCode.append(columnRow[3:6])
                 itemCode.append(columnRow[6:])
         if seasonColumn == 1:
-            dataFrame.insert(1,"seasonal", seasonal, True)
-        dataFrame.insert(2,"group_code",groupCode,True)
-        dataFrame.insert(3,"item_code",itemCode,True)
-
+            dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+1),"seasonal", seasonal, True)
+        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+1),"group_code",groupCode,True)
+        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+2),"item_code",itemCode,True)
     if avgOverQrt == 0 and avgOverYear == 0:
         if m13Drop == 1:
             dataFrame = dataFrame[dataFrame.period != "M13"]
@@ -219,46 +209,11 @@ def createCustomFormattedDataFrame(dataFrame):
             dataFrame = dataFrame.drop(['year','period'],axis=1)
     return dataFrame
 
-def formatString(stringToChange):
-    while ",," in stringToChange:
-        stringToChange = stringToChange.replace(",,",",")
-    if stringToChange[len(stringToChange)-1] == ",":
-        stringToChange = stringToChange[:-1]
-    return stringToChange
-
 def changeRowHeaders(dataFrame):
     dfList = dataFrame.values.tolist()
     for i in range(0,len(dfList[0])):
         dataFrame = dataFrame.rename(columns = {i:dfList[0][i]})
     return dataFrame
-
-def formatPeriod(per):
-    return per[1:]
-
-def experimentalQuarterisation():
-    qrtDF = pd.DataFrame(columns=['series_id','year','quarter_title','quarterly_avg'])
-    temp = dataFrame.groupby(["series_id","year"])
-    print(temp.size())
-    quarterLabel = ["Q1","Q2","Q3","Q4"]
-    t0 = time.time()
-    for key, item in temp:
-        quarter = [[],[],[],[]]
-        dfList = item.values.tolist()
-        print(dfList)
-        for row in dfList:
-            if row[2] in quartersArr[0]:
-                quarter[0].append(float(row[3]))
-            elif row[2] in quartersArr[1]:
-                quarter[1].append(float(row[3]))
-            elif row[2] in quartersArr[2]:
-                quarter[2].append(float(row[3]))
-            elif row[2] in quartersArr[3]:
-                quarter[3].append(float(row[3]))
-        for q in range(0,len(quarter)):
-            qrtDF = qrtDF.append({'series_id':dfList[0][0], 'year':dfList[0][1], 'quarter_title':quarterLabel[q],'quarterly_avg':arrayAvg(quarter[q])},ignore_index=True) 
-    t1 = time.time()
-    print(qrtDF.size)
-    print(t1-t0)
 
 def wpProcessing():
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
