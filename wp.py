@@ -6,6 +6,7 @@ import pandas as pd
 import csv
 path = str(os.path.dirname(os.path.realpath(__file__)))
 quartersArr = ["M01M02M03","M04M05M06","M07M08M09","M10M11M12"]
+months = ["M01","M02","M03","M04","M05","M06","M07","M08","M09","M10","M11","M12"]
 
 class dataRow:
     def __init__(self,seriesID, year, period, value, percentageChange,surveyAbbr, group_code, group_name, item_code, item_name, seasonal, timePeriod, yearOverYear):
@@ -47,27 +48,32 @@ def formatTimePeriod(year,monthPeriod):
 def specialRounding(currentNum, previousNum):
     return round((currentNum-previousNum),1)
 
+# This only works when M13 is active.
 def yearOverYearCalculation(dataFrame,dropM13):
+    yearOverYear = []
+    dataFrame = dataFrame.sort_values(by=["period","year"])
+    for i in range(0,len(dataFrame)):
+        yearOverYear.append("")
+    dataFrame.insert(3,"yearOverYear",yearOverYear,True)
+    grouped = dataFrame.groupby("series_id")
     newDF = []
-    labelDict = []
-    dfList = dataFrame.values.tolist()
-    for j in range(0,len(dfList)):
-        newRowQrt = dataRow(dfList[j][0],dfList[j][1],dfList[j][2],dfList[j][3],"","","","","","","","","")
-        newDF.append(newRowQrt)
-    for i in range(0,len(newDF)):
-        if newDF[i].seriesID not in labelDict:
-            labelDict.append(newDF[i].seriesID)
-            newDF[i].yearOverYear = "-"
-            if dropM13 == 1:
-                for k in range(1,12):
-                    print(str(newDF[int(i+k)]))
-                    newDF[int(i+k)].yearOverYear = "-"
+    for group in grouped:
+        tempGroup = group[1]
+        # Checks if M13 exists in the row
+        #if "M13" not in tempGroup["period"].unique():
+        tempGroup = tempGroup.values.tolist()
+        tempGroup[0][5] = "X"
+        for i in range(1,len(tempGroup)):
+            if int(tempGroup[i][1]) > int(tempGroup[i-1][1]):
+                tempGroup[i][5] = specialRounding(float(tempGroup[i][4]),float(tempGroup[i-1][4]))
             else:
-                for k in range(1,13):
-                    print(str(newDF[int(i+k)]))
-                    newDF[int(i+k)].yearOverYear = "-"
-    for l in newDF:
-        print(str(l))
+                tempGroup[i][5] = "X"
+        for i in tempGroup:
+            newDF.append(i)
+            
+    newFrame = pd.DataFrame(newDF,columns=["series_id","year","period","footnote_code","value","yearOverYear"])
+    newFrame = newFrame.sort_values(by=["series_id","year"])
+    return newFrame
 
 def quarteriseDataFrame(dataFrame):
     newDF = []
@@ -145,8 +151,11 @@ def createCustomFormattedDataFrame(dataFrame):
         if avgOverYear == 1:
             dataFrame = yearifyDataFrame(dataFrame)
         else:
-            timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
             m13Drop = int(input("Would you like to drop all M13 periods?: "))
+            yearOverYearBool = int(input("Would you like the year-over-year percentage changes calculated?"))
+            if yearOverYearBool == 1:
+                dataFrame = yearOverYearCalculation(dataFrame,m13Drop)
+            timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
     if avgOverQrt == 1:
         dataFrame = quarteriseDataFrame(dataFrame)
     percentageChg = int(input("Would you like to add the percentage change between periods?: "))
@@ -219,5 +228,4 @@ def wpProcessing():
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
     newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("wpCur",BLS_Request.getAllFilesInDirectory("wpCur"))
     writeToCSV(newPath,createCustomFormattedDataFrame(changeRowHeaders(readParquet(newPath)).drop([0])))
-
 wpProcessing()
