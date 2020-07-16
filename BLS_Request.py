@@ -13,6 +13,7 @@ BLS_BASE_URL = "https://download.bls.gov/pub/time.series/"
 urlDict = {
     "pc": "pc",
     "pcCur": "pc/pc.data.0.Current",
+    "pcInd": "pc/pc.industry",
     "pcLRef": "pc/pc.product",
     "wp": "wp",
     "wpCur": "wp/wp.data.0.Current",
@@ -86,7 +87,7 @@ def checkForIndustryOrCommodity(wpOrpc, newPath):
     currentPath = ""
     if wpOrpc == "pcCur":
         currentPath = newPath + '\\Industry'
-    elif wpOrpc == "pcLRef":
+    elif wpOrpc == "pcLRef" or wpOrpc == "pcInd":
         currentPath = newPath + '\\Industry\\Labels'
     elif wpOrpc == "wpCur":
         currentPath = newPath + '\\Commodity'
@@ -115,6 +116,8 @@ def getAllFilesInDirectory(wpOrpc):
             elif wpOrpc == "wpLRef" and "labels" in file:
                 filesInDirectory.append(file)
             elif wpOrpc == "wpGrp" and "groupLabels" in file:
+                filesInDirectory.append(file)
+            elif wpOrpc == "pcInd" and "industryLabels" in file:
                 filesInDirectory.append(file)
     return filesInDirectory
 
@@ -159,6 +162,8 @@ def getLatestVersionFileName(wpOrpc,filesInDirectory):
             return "Commodity\\" + fileName
         elif wpOrpc == "pcLRef":
             return "Industry\\Labels\\" + fileName
+        elif wpOrpc == "pcInd":
+            return "Industry\\Labels\\" + fileName
         elif wpOrpc == "wpLRef":
             return "Commodity\\Labels\\" + fileName
         elif wpOrpc == "wpGrp":
@@ -180,6 +185,8 @@ def createFileName(latestVersionDate,wpOrpc):
         return "commodity_labels_" + latestVersionDate
     elif wpOrpc == "wpGrp":
         return "commodity_groupLabels_" + latestVersionDate
+    elif wpOrpc == "pcInd":
+        return "industry_industryLabels_" + latestVersionDate
 
 def getAndFormatData(url,wpOrpc,newVerDateTime):
     newBLSData = getBLSData(url, wpOrpc)
