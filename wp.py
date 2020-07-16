@@ -362,4 +362,4 @@ def wpProcessing():
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
     newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("wpCur",BLS_Request.getAllFilesInDirectory("wpCur"))
     writeToCSV(newPath,createCustomFormattedDataFrame(changeRowHeaders(readParquet(newPath)).drop([0])))
-wpProcessing()
+
