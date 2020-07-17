@@ -234,8 +234,8 @@ def createCustomFormattedDataFrame(dataFrame):
         # Gets the item labels using the BLS_Request library.
         BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("pcLRef","labels")
         # Creates the paths for the for the item labels and the group labels
-        newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("pcLRef",BLS_Request.getAllFilesInDirectory("pcLRef"))
-        newGroupPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("pcInd",BLS_Request.getAllFilesInDirectory("pcInd"))
+        newPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("pcLRef",BLS_Request.getAllFilesInDirectory("pcLRef")))
+        newGroupPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("pcInd",BLS_Request.getAllFilesInDirectory("pcInd")))
         # Modifies the row headers for the two data frames.
         newGroupFrame = changeRowHeaders(readParquet(newGroupPath)).drop([0])
         newDataFrame = changeRowHeaders(readParquet(newPath)).drop([0]) 
@@ -345,5 +345,5 @@ def changeRowHeaders(dataFrame):
 # A function that encapsulates all the code that is needed to be run to produce formatted data.
 def pcProcessing():
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("pcCur","Current")
-    newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("pcCur",BLS_Request.getAllFilesInDirectory("pcCur"))
+    newPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("pcCur",BLS_Request.getAllFilesInDirectory("pcCur")))
     writeToCSV(newPath,createCustomFormattedDataFrame(changeRowHeaders(readParquet(newPath)).drop([0])))
