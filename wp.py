@@ -1,7 +1,6 @@
 import BLS_Request
 import os
 import pyarrow.parquet as pq
-import time 
 import pandas as pd
 import csv
 #path: Dynamic path which is the current directory where the wp.py program is located.
@@ -234,8 +233,8 @@ def createCustomFormattedDataFrame(dataFrame):
         # Gets the item labels using the BLS_Request library.
         BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpLRef","labels")
         # Creates the paths for the for the item labels and the group labels
-        newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("wpLRef",BLS_Request.getAllFilesInDirectory("wpLRef"))
-        newGroupPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("wpGrp",BLS_Request.getAllFilesInDirectory("wpGrp"))
+        newPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("wpLRef",BLS_Request.getAllFilesInDirectory("wpLRef")))
+        newGroupPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("wpGrp",BLS_Request.getAllFilesInDirectory("wpGrp")))
         # Modifies the row headers for the two data frames.
         newGroupFrame = changeRowHeaders(readParquet(newGroupPath)).drop([0])
         newDataFrame = changeRowHeaders(readParquet(newPath)).drop([0])
@@ -360,6 +359,5 @@ def changeRowHeaders(dataFrame):
 # A function that encapsulates all the code that is needed to be run to produce formatted data.
 def wpProcessing():
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
-    newPath = path + '\\RawData\\' + BLS_Request.getLatestVersionFileName("wpCur",BLS_Request.getAllFilesInDirectory("wpCur"))
-    writeToCSV(newPath,createCustomFormattedDataFrame(changeRowHeaders(readParquet(newPath)).drop([0])))
-
+    newPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("wpCur",BLS_Request.getAllFilesInDirectory("wpCur")))
+    writeToCSV(newPath,createCustomFormattedDataFrame(changeRowHeaders(readParquet(newPath)).drop([0]))
