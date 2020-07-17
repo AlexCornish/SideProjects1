@@ -6,7 +6,6 @@ import re
 import pyarrow as pa
 import pyarrow.parquet as pq
 import os
-import time
  
 path = str(os.path.dirname(os.path.realpath(__file__))) 
 BLS_BASE_URL = "https://download.bls.gov/pub/time.series/"
@@ -22,12 +21,13 @@ urlDict = {
 }
 
 def checkForLatestVersion(wpOrpc,fileNameToCheckFor):
-    # currentLastestVersion: The information about the currentLatestVersion that will be compared against the time and date of the latest version available on the BLS website. 
     # wpOrpc: Indicates whether the data to be accessed is from wp (commodity) or pc (industry).
+    # fileNameToCheckFor: 
     # Gets the main downloads page from which the time of latest update can be accessed
-    URL = BLS_BASE_URL + urlDict[wpOrpc]
+    url = os.path.join(BLS_BASE_URL,urlDict[wpOrpc])
     # The URL is selected
-    page = requests.get(URL)
+    page = requests.get(url)
+    # The text access through the request gets converted to a string.
     tempString = str(page.text)
     tempString = tempString.split()
     latestDate = ""
@@ -74,10 +74,10 @@ def compareLatestOnlineVersionWithLatestDownloadedVersion(wpOrpc,fileNameToCheck
         if newVerDate == downloadDate and newVerTime == downloadTime:
             print("Latest version is already downloaded.")
         else:
-            url = BLS_BASE_URL + urlDict[wpOrpc]
+            url = os.path.join(BLS_BASE_URL,urlDict[wpOrpc])
             getAndFormatData(url,wpOrpc,(newVerDate,newVerTime))
     else:
-        url = BLS_BASE_URL + urlDict[wpOrpc]
+        url = os.path.join(BLS_BASE_URL,urlDict[wpOrpc])
         fileName = checkForLatestVersion(wpOrpc[:2],urlDict[wpOrpc][3:]).split("_")
         newVerDate = datetime.date(int(fileName[0]),int(fileName[1]),int(fileName[2]))
         newVerTime = datetime.time(int(fileName[3]),int(fileName[4]))
