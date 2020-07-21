@@ -377,10 +377,13 @@ def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
     # Checks if the user has had the time formatted..
     elif timeForm == 1:
         # Columns to drop from the original dataframe
-        toDropFromDataframe = ["formatted_time","value","footnote_code"]
+        toDropFromDataframe = ["formatted_time","value"]
         # Values that will be included in the wide formatting
-        valuesForDF = ["value","footnote_code"]
+        valuesForDF = ["value"]
         # Checks if percentage change is selected
+        if 'footnote_code' in dataframe:
+            toDropFromDataframe.append("footnote_code")
+            valuesForDF.append("footnote_code")
         if percentageChg == 1:
             # Adds the percent_change column to the dropped column list and the value list
             toDropFromDataframe.append("percent_change")
@@ -400,9 +403,12 @@ def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
         return result
     else:
         # Columns to drop from the original dataframe
-        toDropFromDataframe = ["year","period","value","footnote_code"]
+        toDropFromDataframe = ["year","period","value"]
         # Values that will be included in the wide formatting
-        valuesForDF = ["value","footnote_code"]
+        valuesForDF = ["value"]
+        if 'footnote_code' in dataframe:
+            toDropFromDataframe.append("footnote_code")
+            valuesForDF.append("footnote_code")
         # Checks if percentage change is selected
         if percentageChg == 1:
             # Adds the percent_change column to the dropped column list and the value list
