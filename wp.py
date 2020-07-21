@@ -319,8 +319,7 @@ def createCustomFormattedDataFrame(dataFrame):
             # Drops the year and period columns as formatted time replaces them.
             dataFrame = dataFrame.drop(['year','period'],axis=1)
     # Asks the user if they want the dataframe converted into narrow format.
-    #dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
-    dataFrameMelting = 1
+    dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
     if dataFrameMelting == 1:
         # Returns the melted dataframe.
         return wideFormat(dataFrame,avgOverQrt,avgOverYear,timeFormat,percentageChg,yearOverYearBool)
