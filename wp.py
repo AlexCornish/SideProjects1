@@ -198,6 +198,7 @@ def createCustomFormattedDataFrame(dataFrame):
     # Initialises the values to avoid problems with use before initialisation. 
     avgOverYear = 0
     timeFormat = 0
+    yearOverYearBool = 0
     # ________________ Control flow _____________________ (This needs to be improved.)
     print("For each of these options type 1 for yes or 0 for no:")
     avgOverQrt = int(input("Would you like the values averaged over quarters?: "))
@@ -318,36 +319,109 @@ def createCustomFormattedDataFrame(dataFrame):
             # Drops the year and period columns as formatted time replaces them.
             dataFrame = dataFrame.drop(['year','period'],axis=1)
     # Asks the user if they want the dataframe converted into narrow format.
-    dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
+    #dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
+    dataFrameMelting = 1
     if dataFrameMelting == 1:
         # Returns the melted dataframe.
-        return dataFrameMelt(dataFrame,avgOverQrt,avgOverYear,timeFormat)
+        return wideFormat(dataFrame,avgOverQrt,avgOverYear,timeFormat,percentageChg,yearOverYearBool)
     else:
         return dataFrame
 
-# Converts the dataframe from wide to narrow format.
-def dataFrameMelt(dataFrame,avgQrt,avgYear,timeForm):
+# Converts the standard dataframe into the wide format.
+def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
     # Initialises the columnTitle
     columnTitle = []
     # Iterates through the dataframe columns. 
-    for col in dataFrame.columns:
+    for col in dataframe.columns:
         # Appends the col to the columnTitle array
         columnTitle.append(col)
     # Checks if the user has had the data formatted by quarters.
     if avgQrt == 1:
-        # Returns the narrow formatted data.
-        return pd.melt(dataFrame,id_vars=columnTitle[:(columnTitle.index("quarter")+1)],value_vars=columnTitle[(columnTitle.index("quarter")+1):])
+        # Columns to drop from the original dataframe
+        toDropFromDataframe = ["year","quarter","value"]
+        # Values that will be included in the wide formatting
+        valuesForDF = ["value"]
+        # Checks if percentage change is selected
+        if percentageChg == 1:
+            # Adds the percent_change column to the dropped column list and the value list
+            toDropFromDataframe.append("percent_change")
+            valuesForDF.append("percent_change")
+        # Pivots the dataframe based on the values list.
+        df = dataframe.pivot_table(index="series_id",columns=["year","quarter"],values=valuesForDF,aggfunc='first')
+        # Drops the columns that are in the toDrop list
+        dataframe = dataframe.drop(columns=toDropFromDataframe)
+        # Eliminates the duplicate rows from the dataframe.
+        dataframe = dataframe.drop_duplicates()
+        # Merges the pivoted dataframe and the original one.
+        result = pd.merge(left=dataframe,right=df,how='inner',right_index=True,left_on='series_id')
+        return result
     # Checks if the user has had the data formatted by years.
     elif avgYear == 1:
-        # Returns the narrow formatted data.
-        return pd.melt(dataFrame,id_vars=columnTitle[:(columnTitle.index("year")+1)],value_vars=columnTitle[(columnTitle.index("year")+1):])
+        # Columns to drop from the original dataframe
+        toDropFromDataframe = ["year","value"]
+        # Values that will be included in the wide formatting
+        valuesForDF = ["value"]
+        # Checks if percentage change is selected
+        if percentageChg == 1:
+            # Adds the percent_change column to the dropped column list and the value list
+            toDropFromDataframe.append("percent_change")
+            valuesForDF.append("percent_change")
+        # Pivots the dataframe based on the values list.
+        df = dataframe.pivot(index="series_id",columns="year",values=valuesForDF)
+        # Drops the columns that are in the toDrop list
+        dataframe = dataframe.drop(columns=toDropFromDataframe)
+        # Eliminates the duplicate rows from the dataframe.
+        dataframe = dataframe.drop_duplicates()
+        result = pd.merge(left=dataframe,right=df,how='inner',right_index=True,left_on='series_id')
+        # Merges the pivoted dataframe and the original one.
+        return result
     # Checks if the user has had the time formatted..
     elif timeForm == 1:
-        # Returns the narrow formatted data.
-        return pd.melt(dataFrame,id_vars=columnTitle[:(columnTitle.index("formatted_time")+1)],value_vars=columnTitle[(columnTitle.index("formatted_time")+1):])
+        # Columns to drop from the original dataframe
+        toDropFromDataframe = ["formatted_time","value","footnote_code"]
+        # Values that will be included in the wide formatting
+        valuesForDF = ["value","footnote_code"]
+        # Checks if percentage change is selected
+        if percentageChg == 1:
+            # Adds the percent_change column to the dropped column list and the value list
+            toDropFromDataframe.append("percent_change")
+            valuesForDF.append("percent_change")
+        if yearToDrop == 1:
+            # Adds the year over year column to the dropped column list and the value list
+            toDropFromDataframe.append("yearOverYear")
+            valuesForDF.append("yearOverYear")
+        # Pivots the dataframe based on the values list.
+        df = dataframe.pivot(index="series_id",columns="formatted_time",values=valuesForDF)
+        # Drops the columns that are in the toDrop list
+        dataframe = dataframe.drop(columns=toDropFromDataframe)
+        # Eliminates the duplicate rows from the dataframe.
+        dataframe = dataframe.drop_duplicates()
+        # Merges the pivoted dataframe and the original one.
+        result = pd.merge(left=dataframe,right=df,how='inner',right_index=True,left_on='series_id')
+        return result
     else:
-        # Returns the narrow formatted data.
-        return pd.melt(dataFrame,id_vars=columnTitle[:(columnTitle.index("period")+1)],value_vars=columnTitle[(columnTitle.index("period")+1):])
+        # Columns to drop from the original dataframe
+        toDropFromDataframe = ["year","period","value","footnote_code"]
+        # Values that will be included in the wide formatting
+        valuesForDF = ["value","footnote_code"]
+        # Checks if percentage change is selected
+        if percentageChg == 1:
+            # Adds the percent_change column to the dropped column list and the value list
+            toDropFromDataframe.append("percent_change")
+            valuesForDF.append("percent_change")
+        if yearToDrop == 1:
+            # Adds the year over year column to the dropped column list and the value list
+            toDropFromDataframe.append("yearOverYear")
+            valuesForDF.append("yearOverYear")
+        # Pivots the dataframe based on the values list.
+        df = dataframe.pivot_table(index="series_id",columns=["year","period"],values=valuesForDF,aggfunc='first')
+        # Drops the columns that are in the toDrop list
+        dataframe = dataframe.drop(columns=toDropFromDataframe)
+        # Eliminates the duplicate rows from the dataframe.
+        dataframe = dataframe.drop_duplicates()
+        # Merges the pivoted dataframe and the original one.
+        result = pd.merge(left=dataframe,right=df,how='inner',right_index=True,left_on='series_id')
+        return result
 
 # Modifies the row headers. Takes the column titles from the first row in the dataframe and renames the column index titles with the content. 
 def changeRowHeaders(dataFrame):
