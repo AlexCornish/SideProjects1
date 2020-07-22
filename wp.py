@@ -3,6 +3,9 @@ import os
 import pyarrow.parquet as pq
 import pandas as pd
 import csv
+
+import cProfile
+
 #path: Dynamic path which is the current directory where the wp.py program is located.
 path = str(os.path.dirname(os.path.realpath(__file__)))
 #QuartersArr: Contains the quarters used in the quartising function. 
@@ -201,130 +204,123 @@ def createCustomFormattedDataFrame(dataFrame):
     yearOverYearBool = 0
     # ________________ Control flow _____________________ (This needs to be improved.)
     print("For each of these options type 1 for yes or 0 for no:")
-    avgOverQrt = int(input("Would you like the values averaged over quarters?: "))
+    #avgOverQrt = int(input("Would you like the values averaged over quarters?: "))
+    avgOverQrt = 0
     if avgOverQrt == 0:
-        avgOverYear = int(input("Would you like the values averaged over the years?: "))
+        avgOverYear = 0#int(input("Would you like the values averaged over the years?: "))
         if avgOverYear == 1:
             # dataframe gets replaced with a dataframe in the "yearified" format.
             dataFrame = yearifyDataFrame(dataFrame)
         else:
-            m13Drop = int(input("Would you like to drop all M13 periods?: "))
-            yearOverYearBool = int(input("Would you like the year-over-year percentage changes calculated?"))
+            m13Drop = 1#int(input("Would you like to drop all M13 periods?: "))
+            yearOverYearBool = 1#int(input("Would you like the year-over-year percentage changes calculated?"))
             if yearOverYearBool == 1:
                 # Returns the dataframe with the year over year calculations added.
                 dataFrame = yearOverYearCalculation(dataFrame,m13Drop)
-            timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
+            timeFormat = 1#int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
     if avgOverQrt == 1:
         # Converts the dataframe from periods into quarters
         dataFrame = quarteriseDataFrame(dataFrame)
-    percentageChg = int(input("Would you like to add the percentage change between periods?: "))
-    labelAdd = int(input("Would you like to add labels for each level?: "))
-    codeSplit = int(input("Would you like to split all the id codes?: "))
-    seasonColumn = int(input("Would you like to add a column for seasonal codes?: "))
-    # Initialises the arrays 
-    seasonal = []
-    groupCode = []
-    itemCode = []
+    percentageChg = 1#int(input("Would you like to add the percentage change between periods?: "))
+    labelAdd =1#int(input("Would you like to add labels for each level?: "))
+    codeSplit = 1#int(input("Would you like to split all the id codes?: "))
+    seasonColumn = 1#int(input("Would you like to add a column for seasonal codes?: "))
     if percentageChg == 1:
         # Returns the dataframe with period over period calculations performed.
         dataFrame = periodOverPeriodCalculation(dataFrame)
     if labelAdd == 1:
-        # Gets the group labels using the BLS_Request library.
-        BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpGrp","groupLabels")
-        # Gets the item labels using the BLS_Request library.
-        BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpLRef","labels")
-        # Creates the paths for the for the item labels and the group labels
-        newPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("wpLRef",BLS_Request.getAllFilesInDirectory("wpLRef")))
-        newGroupPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("wpGrp",BLS_Request.getAllFilesInDirectory("wpGrp")))
-        # Modifies the row headers for the two data frames.
-        newGroupFrame = changeRowHeaders(readParquet(newGroupPath)).drop([0])
-        newDataFrame = changeRowHeaders(readParquet(newPath)).drop([0])
-        # Merges the two dataframes using a left join.
-        mergeLeft = pd.merge(left=newGroupFrame,right=newDataFrame,how='left',left_on='group_code',right_on='group_code')
-        # Iterates through the rows by the dataframe index.
-        for row in dataFrame.index:
-            # gets the series_id from each row
-            columnRow = dataFrame["series_id"][row]
-            # adds the seasonal letter to the seasonal array
-            seasonal.append(columnRow[2:3])
-            # Checks if this splice of the series_id is in the list of group codes
-            if columnRow[3:5] in newGroupFrame["group_code"].tolist():
-                # If this splice is in the group code list, it is added to the group code array and the last part of the series_id is added to the itemcode.
-                groupCode.append(columnRow[3:5])
-                itemCode.append(columnRow[5:])
-            # Checks if this splice of the series_id is in the list of group codes
-            elif columnRow[3:6] in newGroupFrame["group_code"].tolist():
-                # If this splice is in the group code list, it is added to the group code array and the last part of the series_id is added to the itemcode.
-                groupCode.append(columnRow[3:6])
-                itemCode.append(columnRow[6:])
-        # Checks if the seasonColumn is wanted
-        if seasonColumn == 1:
-            # Attachs the season column.
-            dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+1),"seasonal", seasonal, True)
-        # Attachs the group code to the dataframe
-        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+1),"group_code",groupCode,True)
-        # Attachs the item code to the dataframe
-        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+2),"item_code",itemCode,True)
-        # Performs a left join on the dataframe and the mergeLeft dataframe to add the labels. 
-        dataFrame = pd.merge(left=dataFrame,right=mergeLeft,how='left',left_on=['group_code','item_code'],right_on=['group_code','item_code'])
-        # Gets the list of headers
-        listOfHeaders = list(dataFrame.columns)
-        # Sets the item at the group_name index to item_code
-        listOfHeaders[listOfHeaders.index("group_name")] = "item_code"
-        # Sets the item at the item_code index to group_name
-        listOfHeaders[listOfHeaders.index("item_code")] = "group_name"
-        # Reindexes the dataframe based on the modified list of headers.
-        dataFrame = dataFrame.reindex(columns=listOfHeaders)
+        dataFrame = labelToAdd(dataFrame,seasonColumn,percentageChg)
     elif codeSplit == 1:
-        # Iterates through the rows by the dataframe index.
-        for row in dataFrame.index:
-            # gets the series_id from each row
-            columnRow = dataFrame["series_id"][row]
-            # adds the seasonal letter to the seasonal array
-            seasonal.append(columnRow[2:3])
-            # Checks if this splice of the series_id is in the list of group codes
-            if columnRow[3:5] in newGroupFrame["group_code"].tolist():
-                # If this splice is in the group code list, it is added to the group code array and the last part of the series_id is added to the itemcode.
-                groupCode.append(columnRow[3:5])
-                itemCode.append(columnRow[5:])
-            # Checks if this splice of the series_id is in the list of group codes
-            elif columnRow[3:6] in newGroupFrame["group_code"].tolist():
-                # If this splice is in the group code list, it is added to the group code array and the last part of the series_id is added to the itemcode.
-                groupCode.append(columnRow[3:6])
-                itemCode.append(columnRow[6:])
-        # Checks if the seasonColumn is wanted
-        if seasonColumn == 1:
-            # Attachs the season column to the dataframe
-            dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+1),"seasonal", seasonal, True)
-        # Attachs the group code to the dataframe
-        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+1),"group_code",groupCode,True)
-        # Attachs the item code to the dataframe
-        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+2),"item_code",itemCode,True)
+        newGroupPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("wpGrp",BLS_Request.getAllFilesInDirectory("wpGrp")))
+        newGroupFrame = changeRowHeaders(readParquet(newGroupPath)).drop([0])
+        dataFrame = labelMod(dataFrame,newGroupFrame,seasonColumn,percentageChg)
     # Checks if the quartised or yearified functions haven't been used and the dataframe is in standard period format.
     if avgOverQrt == 0 and avgOverYear == 0:
         # Check if m13 is to be dropped
         if m13Drop == 1:
             # Drops all entries that have a period equal to M13 from the dataframe
-            dataFrame = dataFrame[dataFrame.period != "M13"]
+            dataFrame = dropM13(dataFrame)
         # Checks if the user wants the time formatted in yyyy-mm-01 format.
         if timeFormat == 1:
-            # Initialises an array for the formatted time.
-            formattedTime = []
-            # Iterates through the dataframe by index.
-            for row in dataFrame.index:
-                # Formats the time period based on the parameters and appends it to the formatted time array.
-                formattedTime.append(formatTimePeriod(dataFrame["year"][row],dataFrame["period"][row]))
-            # Attachs the formatted_time array to the dataframe.
-            dataFrame.insert(1,"formatted_time",formattedTime,True)
-            # Drops the year and period columns as formatted time replaces them.
-            dataFrame = dataFrame.drop(['year','period'],axis=1)
+            dataFrame = formatTimeFunc(dataFrame)
     # Asks the user if they want the dataframe converted into narrow format.
-    dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
+    dataFrameMelting = 0#int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
     if dataFrameMelting == 1:
         # Returns the melted dataframe.
         return wideFormat(dataFrame,avgOverQrt,avgOverYear,timeFormat,percentageChg,yearOverYearBool)
     else:
         return dataFrame
+
+def dropM13(dataFrame):
+    return dataFrame[dataFrame.period != "M13"]
+
+# Functions that need to be modified to enhance perform
+#________________________________________________________________
+def formatTimeFunc(dataFrame):
+    formattedTime = []
+    # Iterates through the dataframe by index.
+    for row in dataFrame.index:
+        # Formats the time period based on the parameters and appends it to the formatted time array.
+        formattedTime.append(formatTimePeriod(dataFrame["year"][row],dataFrame["period"][row]))
+    # Attachs the formatted_time array to the dataframe.
+    dataFrame.insert(1,"formatted_time",formattedTime,True)
+    # Drops the year and period columns as formatted time replaces them.
+    return dataFrame.drop(['year','period'],axis=1)    
+
+def labelToAdd(dataFrame,seasonColumn,percentageChg):
+    # Gets the group labels using the BLS_Request library.
+    BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpGrp","groupLabels")
+    # Gets the item labels using the BLS_Request library.
+    BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpLRef","labels")
+    # Creates the paths for the for the item labels and the group labels
+    newPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("wpLRef",BLS_Request.getAllFilesInDirectory("wpLRef")))
+    newGroupPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("wpGrp",BLS_Request.getAllFilesInDirectory("wpGrp")))
+    # Modifies the row headers for the two data frames.
+    newGroupFrame = changeRowHeaders(readParquet(newGroupPath)).drop([0])
+    newDataFrame = changeRowHeaders(readParquet(newPath)).drop([0])
+    # Merges the two dataframes using a left join.
+    mergeLeft = pd.merge(left=newGroupFrame,right=newDataFrame,how='left',left_on='group_code',right_on='group_code')
+    dataFrame = labelMod(dataFrame,newGroupFrame,seasonColumn,percentageChg)
+    # Performs a left join on the dataframe and the mergeLeft dataframe to add the labels. 
+    dataFrame = pd.merge(left=dataFrame,right=mergeLeft,how='left',left_on=['group_code','item_code'],right_on=['group_code','item_code'])
+    # Gets the list of headers
+    listOfHeaders = list(dataFrame.columns)
+    # Sets the item at the group_name index to item_code
+    listOfHeaders[listOfHeaders.index("group_name")] = "item_code"
+    # Sets the item at the item_code index to group_name
+    listOfHeaders[listOfHeaders.index("item_code")] = "group_name"
+    # Reindexes the dataframe based on the modified list of headers.
+    return dataFrame.reindex(columns=listOfHeaders)
+
+def labelMod(dataFrame,newGroupFrame,seasonColumn,percentageChg):
+    # Initialises the arrays 
+    seasonal = []
+    groupCode = []
+    itemCode = []
+    for row in dataFrame.index:
+        # gets the series_id from each row
+        columnRow = dataFrame["series_id"][row]
+        # adds the seasonal letter to the seasonal array
+        seasonal.append(columnRow[2:3])
+        # Checks if this splice of the series_id is in the list of group codes
+        if columnRow[3:5] in newGroupFrame["group_code"].tolist():
+            # If this splice is in the group code list, it is added to the group code array and the last part of the series_id is added to the itemcode.
+            groupCode.append(columnRow[3:5])
+            itemCode.append(columnRow[5:])
+        # Checks if this splice of the series_id is in the list of group codes
+        elif columnRow[3:6] in newGroupFrame["group_code"].tolist():
+            # If this splice is in the group code list, it is added to the group code array and the last part of the series_id is added to the itemcode.
+            groupCode.append(columnRow[3:6])
+            itemCode.append(columnRow[6:])
+    # Checks if the seasonColumn is wanted
+    if seasonColumn == 1:
+        # Attachs the season column to the dataframe
+        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+1),"seasonal", seasonal, True)
+    # Attachs the group code to the dataframe
+    dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+1),"group_code",groupCode,True)
+    # Attachs the item code to the dataframe
+    dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+2),"item_code",itemCode,True)
+    return dataFrame
 
 # Converts the standard dataframe into the wide format.
 def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
@@ -440,3 +436,5 @@ def wpProcessing():
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
     newPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("wpCur",BLS_Request.getAllFilesInDirectory("wpCur")))
     writeToCSV(newPath,createCustomFormattedDataFrame(changeRowHeaders(readParquet(newPath)).drop([0])))
+
+cProfile.run("wpProcessing()")
