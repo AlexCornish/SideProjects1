@@ -4,6 +4,7 @@ import pyarrow.parquet as pq
 import pandas as pd
 import csv
 
+import time
 import cProfile
 
 #path: Dynamic path which is the current directory where the wp.py program is located.
@@ -42,7 +43,7 @@ def writeToCSV(fileName,data):
 # Formats the date from a separate year / month (period) to a string that is in the yyyy-mm-01 format.
 def formatTimePeriod(year,monthPeriod):
     # monthPeriod[1:]: (string) Removes the M from the MXX period string to leave the numbers.
-    return year + "-" + monthPeriod[1:] + "-01"
+    return year + "-" + monthPeriod + "-01"
 
 # Rounds the resulting difference from currentNum - previousNum
 def specialRounding(currentNum, previousNum):
@@ -254,19 +255,16 @@ def createCustomFormattedDataFrame(dataFrame):
 def dropM13(dataFrame):
     return dataFrame[dataFrame.period != "M13"]
 
+def formatTimeFunc(dataFrame):
+    # Iterates through the dataframe by index.
+    dataFrame['period'] = dataFrame["period"].str.replace('M',"")
+    dataFrame.year = formatTimePeriod(dataFrame.year,dataFrame.period)
+    # Renames the year column to formatted_time
+    dataFrame = dataFrame.rename(columns={"year": "formatted_time"})
+    return dataFrame.drop(['period'],axis=1)    
+
 # Functions that need to be modified to enhance perform
 #________________________________________________________________
-def formatTimeFunc(dataFrame):
-    formattedTime = []
-    # Iterates through the dataframe by index.
-    for row in dataFrame.index:
-        # Formats the time period based on the parameters and appends it to the formatted time array.
-        formattedTime.append(formatTimePeriod(dataFrame["year"][row],dataFrame["period"][row]))
-    # Attachs the formatted_time array to the dataframe.
-    dataFrame.insert(1,"formatted_time",formattedTime,True)
-    # Drops the year and period columns as formatted time replaces them.
-    return dataFrame.drop(['year','period'],axis=1)    
-
 def labelToAdd(dataFrame,seasonColumn,percentageChg):
     # Gets the group labels using the BLS_Request library.
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpGrp","groupLabels")
@@ -321,6 +319,13 @@ def labelMod(dataFrame,newGroupFrame,seasonColumn,percentageChg):
     # Attachs the item code to the dataframe
     dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+2),"item_code",itemCode,True)
     return dataFrame
+
+
+
+
+
+
+
 
 # Converts the standard dataframe into the wide format.
 def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
@@ -436,5 +441,3 @@ def wpProcessing():
     BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("wpCur","Current")
     newPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("wpCur",BLS_Request.getAllFilesInDirectory("wpCur")))
     writeToCSV(newPath,createCustomFormattedDataFrame(changeRowHeaders(readParquet(newPath)).drop([0])))
-
-cProfile.run("wpProcessing()")
