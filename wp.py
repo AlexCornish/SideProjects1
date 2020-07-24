@@ -36,6 +36,7 @@ def writeToCSV(fileName,data):
     # - data: (Dataframe) The formatted data in a pandas dataframe.
     # removes the .parquet extension from the filename and adds the .csv extension.
     tempName = fileName[:-8] + ".csv"
+    data = data.round(1)
     # converts the dataframe to a .csv file and removes the indexes from the dataframe.
     data.to_csv(tempName,index=False)
     print("Formatted dataframe written to .CSV")
@@ -55,43 +56,48 @@ def specialRounding(currentNum, previousNum):
 def yearOverYearCalculation(dataFrame,dropM13):
     # - dataFrame: (Dataframe) The dataframe containing all the information
     # - dropM13: (Integer) Indicates whether or not the rows containing the M13 have been dropped. 
-    # Initialises the yearOverYear array
-    yearOverYear = []
-    # Sorts the dataframe by period then year
-    dataFrame = dataFrame.sort_values(by=["period","year"])
-    # Populates the blank yearOverYear array with empty strings.
-    for i in range(0,len(dataFrame)):
-        yearOverYear.append("")
-    # Attaches the new yearOverYear column to the current dataFrame.
-    dataFrame.insert(3,"yearOverYear",yearOverYear,True)
-    # Groups the content of the dataframe by the series_id
-    grouped = dataFrame.groupby("series_id")
-    # Initialises the new dataframe
-    newDF = []
-    # Iterates through the grouped dataframe.
-    for group in grouped:
-        tempGroup = group[1]
-        # For each grouped dataframe...
-        # Converts the dataframe to a 2d array.
-        tempGroup = tempGroup.values.tolist()
-        tempGroup[0][5] = "X"
-        # Iterates through the individual group.
-        for i in range(1,len(tempGroup)):
-            # Checks if the year is greater than the year in the row above.
-            if int(tempGroup[i][1]) > int(tempGroup[i-1][1]):
-                # Rounds the difference between the year and the previous year with the same month.
-                tempGroup[i][5] = specialRounding(float(tempGroup[i][4]),float(tempGroup[i-1][4]))
-            else:
-                tempGroup[i][5] = "X"
-        # Iterates through the modified tempGroup
-        for i in tempGroup:
-            # Adds the modified tempGroup row to the newDF
-            newDF.append(i)
-    # Creates a new dataframe from the newDF 2d array.
-    newFrame = pd.DataFrame(newDF,columns=["series_id","year","period","footnote_code","value","yearOverYear"])
-    # Sorts the new dataframe.
-    newFrame = newFrame.sort_values(by=["series_id","year"])
-    return newFrame
+    if dropM13 == 1:
+        dataFrame['value'] = dataFrame['value'].astype(float)
+        dataFrame['year_over_year'] = dataFrame.groupby("series_id")['value'].diff(12)
+        return dataFrame 
+    else:
+        # Initialises the yearOverYear array
+        yearOverYear = []
+        # Sorts the dataframe by period then year
+        dataFrame = dataFrame.sort_values(by=["period","year"])
+        # Populates the blank yearOverYear array with empty strings.
+        for i in range(0,len(dataFrame)):
+            yearOverYear.append("")
+        # Attaches the new yearOverYear column to the current dataFrame.
+        dataFrame.insert(3,"yearOverYear",yearOverYear,True)
+        # Groups the content of the dataframe by the series_id
+        grouped = dataFrame.groupby("series_id")
+        # Initialises the new dataframe
+        newDF = []
+        # Iterates through the grouped dataframe.
+        for group in grouped:
+            tempGroup = group[1]
+            # For each grouped dataframe...
+            # Converts the dataframe to a 2d array.
+            tempGroup = tempGroup.values.tolist()
+            tempGroup[0][5] = "X"
+            # Iterates through the individual group.
+            for i in range(1,len(tempGroup)):
+                # Checks if the year is greater than the year in the row above.
+                if int(tempGroup[i][1]) > int(tempGroup[i-1][1]):
+                    # Rounds the difference between the year and the previous year with the same month.
+                    tempGroup[i][5] = specialRounding(float(tempGroup[i][4]),float(tempGroup[i-1][4]))
+                else:
+                    tempGroup[i][5] = "X"
+            # Iterates through the modified tempGroup
+            for i in tempGroup:
+                # Adds the modified tempGroup row to the newDF
+                newDF.append(i)
+        # Creates a new dataframe from the newDF 2d array.
+        newFrame = pd.DataFrame(newDF,columns=["series_id","year","period","footnote_code","value","yearOverYear"])
+        # Sorts the new dataframe.
+        newFrame = newFrame.sort_values(by=["series_id","year"])
+        return newFrame
 
 # QuarteriseDataFrame: Converts the dataframe from monthly periods to quarters. 
 def quarteriseDataFrame(dataFrame):
@@ -146,27 +152,8 @@ def arrayAvg(arr):
 
 # periodOverPeriodCalculation: Calculates the difference between consecutive time periods
 def periodOverPeriodCalculation(dataFrame):
-    # converts the dataframe to a 2d Array
-    dfList = dataFrame.values.tolist()
-    # Initialises a blank array to store the percentage differences.
-    percentageColumn = []
-    # Initialises the labelDict
-    labelDict = []
-    # Iterates through dfList
-    for row in range(0,len(dfList)):
-        # Checks if the series_id is in the labeldict
-        if dfList[row][0] not in labelDict:
-            labelDict.append(dfList[row][0])
-            # Adds a blank placeholder (X) to the percentage column
-            percentageColumn.append("X")
-        # Checks if the current value in value column or the one above it is a blank placeholder
-        elif dfList[row][dataFrame.columns.get_loc("value")] == "X" or dfList[row-1][dataFrame.columns.get_loc("value")] == "X":
-            percentageColumn.append("X")
-        else:
-        # Adds the difference between the two values to the percentage column.
-            percentageColumn.append(specialRounding(float(dfList[row][dataFrame.columns.get_loc("value")]),float(dfList[row-1][dataFrame.columns.get_loc("value")])))
-    # Adds the percentage column to the dataframe
-    dataFrame.insert((dataFrame.columns.get_loc("value")+1),"percent_change",percentageColumn,True)
+    dataFrame['value'] = dataFrame['value'].astype(float)
+    dataFrame['percent_change'] = dataFrame.groupby("series_id")['value'].diff()
     return dataFrame
 
 # Makes the dataframe from monthly (period based) into year based ones.
@@ -205,27 +192,53 @@ def createCustomFormattedDataFrame(dataFrame):
     yearOverYearBool = 0
     # ________________ Control flow _____________________ (This needs to be improved.)
     print("For each of these options type 1 for yes or 0 for no:")
-    #avgOverQrt = int(input("Would you like the values averaged over quarters?: "))
-    avgOverQrt = 0
+    avgOverQrt = int(input("Would you like the values averaged over quarters?: "))
+    while avgOverQrt != 0 and avgOverQrt != 1:   
+        avgOverQrt = int(input("Would you like the values averaged over quarters?: ")) 
     if avgOverQrt == 0:
-        avgOverYear = 0#int(input("Would you like the values averaged over the years?: "))
+        avgOverYear = int(input("Would you like the values averaged over the years?: "))
+        while avgOverYear != 0 and avgOverYear != 1:    
+            avgOverYear = int(input("Would you like the values averaged over the years?: "))
         if avgOverYear == 1:
             # dataframe gets replaced with a dataframe in the "yearified" format.
             dataFrame = yearifyDataFrame(dataFrame)
         else:
-            m13Drop = 1#int(input("Would you like to drop all M13 periods?: "))
-            yearOverYearBool = 1#int(input("Would you like the year-over-year percentage changes calculated?"))
+            m13Drop = int(input("Would you like to drop all M13 periods?: "))
+            while m13Drop != 0 and m13Drop != 1:
+                m13Drop = int(input("Would you like to drop all M13 periods?: "))
+
+            yearOverYearBool = int(input("Would you like the year-over-year percentage changes calculated?"))
+            while yearOverYearBool != 0 and yearOverYearBool != 1:
+                yearOverYearBool = int(input("Would you like the year-over-year percentage changes calculated?"))
+
             if yearOverYearBool == 1:
                 # Returns the dataframe with the year over year calculations added.
                 dataFrame = yearOverYearCalculation(dataFrame,m13Drop)
-            timeFormat = 1#int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
+
+            timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
+            while timeFormat != 0 and timeFormat != 1:
+                timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
+
     if avgOverQrt == 1:
         # Converts the dataframe from periods into quarters
         dataFrame = quarteriseDataFrame(dataFrame)
-    percentageChg = 1#int(input("Would you like to add the percentage change between periods?: "))
-    labelAdd =1#int(input("Would you like to add labels for each level?: "))
-    codeSplit = 1#int(input("Would you like to split all the id codes?: "))
-    seasonColumn = 1#int(input("Would you like to add a column for seasonal codes?: "))
+    #______Control flow with error checking____________
+    percentageChg = int(input("Would you like to add the percentage change between periods?: "))
+    while percentageChg != 0 and percentageChg != 1:
+        percentageChg = int(input("Would you like to add the percentage change between periods?: "))
+
+    labelAdd =int(input("Would you like to add labels for each level?: "))
+    while labelAdd != 0 and labelAdd != 1:
+        labelAdd =int(input("Would you like to add labels for each level?: "))
+
+    codeSplit = int(input("Would you like to split all the id codes?: "))
+    while codeSplit != 0 and codeSplit != 1:
+        codeSplit = int(input("Would you like to split all the id codes?: "))
+
+    seasonColumn = int(input("Would you like to add a column for seasonal codes?: "))
+    while seasonColumn != 0 and seasonColumn != 1:
+        seasonColumn = int(input("Would you like to add a column for seasonal codes?: "))
+
     if percentageChg == 1:
         # Returns the dataframe with period over period calculations performed.
         dataFrame = periodOverPeriodCalculation(dataFrame)
@@ -243,7 +256,9 @@ def createCustomFormattedDataFrame(dataFrame):
         if timeFormat == 1:
             dataFrame = formatTimeFunc(dataFrame)
     # Asks the user if they want the dataframe converted into narrow format.
-    dataFrameMelting = 0#int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
+    dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
+    while dataFrameMelting != 0 and dataFrameMelting != 1:
+        dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
     if dataFrameMelting == 1:
         # Returns the melted dataframe.
         return wideFormat(dataFrame,avgOverQrt,avgOverYear,timeFormat,percentageChg,yearOverYearBool)
