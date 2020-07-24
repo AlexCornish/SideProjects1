@@ -1,7 +1,6 @@
 import BLS_Request
 import os
 import pyarrow.parquet as pq
-import time 
 import pandas as pd
 import csv
 #path: Dynamic path which is the current directory where the pc.py program is located.
@@ -33,6 +32,7 @@ def writeToCSV(fileName,data):
     # - data: (Dataframe) The formatted data in a pandas dataframe.
     # removes the .parquet extension from the filename and adds the .csv extension.
     tempName = fileName[:-8] + ".csv"
+    data = data.round(1)
     # converts the dataframe to a .csv file and removes the indexes from the dataframe.
     data.to_csv(tempName,index=False)
     print("Formatted dataframe written to .CSV")
@@ -52,43 +52,48 @@ def specialRounding(currentNum, previousNum):
 def yearOverYearCalculation(dataFrame,dropM13):
     # - dataFrame: (Dataframe) The dataframe containing all the information
     # - dropM13: (Integer) Indicates whether or not the rows containing the M13 have been dropped. 
-    # Initialises the yearOverYear array
-    yearOverYear = []
-    # Sorts the dataframe by period then year
-    dataFrame = dataFrame.sort_values(by=["period","year"])
-    # Populates the blank yearOverYear array with empty strings.
-    for i in range(0,len(dataFrame)):
-        yearOverYear.append("")
-    # Attaches the new yearOverYear column to the current dataFrame.
-    dataFrame.insert(3,"yearOverYear",yearOverYear,True)
-    # Groups the content of the dataframe by the series_id
-    grouped = dataFrame.groupby("series_id")
-    # Initialises the new dataframe
-    newDF = []
-    # Iterates through the grouped dataframe.
-    for group in grouped:
-        tempGroup = group[1]
-        # For each grouped dataframe...
-        # Converts the dataframe to a 2d array.
-        tempGroup = tempGroup.values.tolist()
-        tempGroup[0][5] = "X"
-        # Iterates through the individual group.
-        for i in range(1,len(tempGroup)):
-            # Checks if the year is greater than the year in the row above.
-            if int(tempGroup[i][1]) > int(tempGroup[i-1][1]):
-                # Rounds the difference between the year and the previous year with the same month.
-                tempGroup[i][5] = specialRounding(float(tempGroup[i][4]),float(tempGroup[i-1][4]))
-            else:
-                tempGroup[i][5] = "X"
-        # Iterates through the modified tempGroup
-        for i in tempGroup:
-            # Adds the modified tempGroup row to the newDF
-            newDF.append(i)
-    # Creates a new dataframe from the newDF 2d array.
-    newFrame = pd.DataFrame(newDF,columns=["series_id","year","period","footnote_code","value","yearOverYear"])
-    # Sorts the new dataframe.
-    newFrame = newFrame.sort_values(by=["series_id","year"])
-    return newFrame
+    if dropM13 == 1:
+        dataFrame['value'] = dataFrame['value'].astype(float)
+        dataFrame['year_over_year'] = dataFrame.groupby("series_id")['value'].diff(12)
+        return dataFrame 
+    else:
+        # Initialises the yearOverYear array
+        yearOverYear = []
+        # Sorts the dataframe by period then year
+        dataFrame = dataFrame.sort_values(by=["period","year"])
+        # Populates the blank yearOverYear array with empty strings.
+        for i in range(0,len(dataFrame)):
+            yearOverYear.append("")
+        # Attaches the new yearOverYear column to the current dataFrame.
+        dataFrame.insert(3,"yearOverYear",yearOverYear,True)
+        # Groups the content of the dataframe by the series_id
+        grouped = dataFrame.groupby("series_id")
+        # Initialises the new dataframe
+        newDF = []
+        # Iterates through the grouped dataframe.
+        for group in grouped:
+            tempGroup = group[1]
+            # For each grouped dataframe...
+            # Converts the dataframe to a 2d array.
+            tempGroup = tempGroup.values.tolist()
+            tempGroup[0][5] = "X"
+            # Iterates through the individual group.
+            for i in range(1,len(tempGroup)):
+                # Checks if the year is greater than the year in the row above.
+                if int(tempGroup[i][1]) > int(tempGroup[i-1][1]):
+                    # Rounds the difference between the year and the previous year with the same month.
+                    tempGroup[i][5] = specialRounding(float(tempGroup[i][4]),float(tempGroup[i-1][4]))
+                else:
+                    tempGroup[i][5] = "X"
+            # Iterates through the modified tempGroup
+            for i in tempGroup:
+                # Adds the modified tempGroup row to the newDF
+                newDF.append(i)
+        # Creates a new dataframe from the newDF 2d array.
+        newFrame = pd.DataFrame(newDF,columns=["series_id","year","period","footnote_code","value","yearOverYear"])
+        # Sorts the new dataframe.
+        newFrame = newFrame.sort_values(by=["series_id","year"])
+        return newFrame
 
 # QuarteriseDataFrame: Converts the dataframe from monthly periods to quarters. 
 def quarteriseDataFrame(dataFrame):
@@ -143,27 +148,8 @@ def arrayAvg(arr):
 
 # periodOverPeriodCalculation: Calculates the difference between consecutive time periods
 def periodOverPeriodCalculation(dataFrame):
-    # converts the dataframe to a 2d Array
-    dfList = dataFrame.values.tolist()
-    # Initialises a blank array to store the percentage differences.
-    percentageColumn = []
-    # Initialises the labelDict
-    labelDict = []
-    # Iterates through dfList
-    for row in range(0,len(dfList)):
-        # Checks if the series_id is in the labeldict
-        if dfList[row][0] not in labelDict:
-            labelDict.append(dfList[row][0])
-            # Adds a blank placeholder (X) to the percentage column
-            percentageColumn.append("X")
-        # Checks if the current value in value column or the one above it is a blank placeholder
-        elif dfList[row][dataFrame.columns.get_loc("value")] == "X" or dfList[row-1][dataFrame.columns.get_loc("value")] == "X":
-            percentageColumn.append("X")
-        else:
-        # Adds the difference between the two values to the percentage column.
-            percentageColumn.append(specialRounding(float(dfList[row][dataFrame.columns.get_loc("value")]),float(dfList[row-1][dataFrame.columns.get_loc("value")])))
-    # Adds the percentage column to the dataframe
-    dataFrame.insert((dataFrame.columns.get_loc("value")+1),"percent_change",percentageColumn,True)
+    dataFrame['value'] = dataFrame['value'].astype(float)
+    dataFrame['percent_change'] = dataFrame.groupby("series_id")['value'].diff()
     return dataFrame
 
 # Makes the dataframe from monthly (period based) into year based ones.
@@ -203,113 +189,107 @@ def createCustomFormattedDataFrame(dataFrame):
     # ________________ Control flow _____________________ (This needs to be improved.)
     print("For each of these options type 1 for yes or 0 for no:")
     avgOverQrt = int(input("Would you like the values averaged over quarters?: "))
+    while avgOverQrt != 0 and avgOverQrt != 1:   
+        avgOverQrt = int(input("Would you like the values averaged over quarters?: ")) 
     if avgOverQrt == 0:
         avgOverYear = int(input("Would you like the values averaged over the years?: "))
+        while avgOverYear != 0 and avgOverYear != 1:    
+            avgOverYear = int(input("Would you like the values averaged over the years?: "))
         if avgOverYear == 1:
             # dataframe gets replaced with a dataframe in the "yearified" format.
             dataFrame = yearifyDataFrame(dataFrame)
         else:
             m13Drop = int(input("Would you like to drop all M13 periods?: "))
+            while m13Drop != 0 and m13Drop != 1:
+                m13Drop = int(input("Would you like to drop all M13 periods?: "))
+
             yearOverYearBool = int(input("Would you like the year-over-year percentage changes calculated?"))
+            while yearOverYearBool != 0 and yearOverYearBool != 1:
+                yearOverYearBool = int(input("Would you like the year-over-year percentage changes calculated?"))
+
             if yearOverYearBool == 1:
                 # Returns the dataframe with the year over year calculations added.
                 dataFrame = yearOverYearCalculation(dataFrame,m13Drop)
+
             timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
+            while timeFormat != 0 and timeFormat != 1:
+                timeFormat = int(input("Would you like the dates converted to yyyy-mm-01 format?: "))
+
     if avgOverQrt == 1:
         # Converts the dataframe from periods into quarters
         dataFrame = quarteriseDataFrame(dataFrame)
+    #______Control flow with error checking____________
     percentageChg = int(input("Would you like to add the percentage change between periods?: "))
-    labelAdd = int(input("Would you like to add labels for each level?: "))
+    while percentageChg != 0 and percentageChg != 1:
+        percentageChg = int(input("Would you like to add the percentage change between periods?: "))
+
+    labelAdd =int(input("Would you like to add labels for each level?: "))
+    while labelAdd != 0 and labelAdd != 1:
+        labelAdd =int(input("Would you like to add labels for each level?: "))
+
     codeSplit = int(input("Would you like to split all the id codes?: "))
+    while codeSplit != 0 and codeSplit != 1:
+        codeSplit = int(input("Would you like to split all the id codes?: "))
+
     seasonColumn = int(input("Would you like to add a column for seasonal codes?: "))
-    # Initialises the arrays 
-    seasonal = []
-    groupCode = []
-    itemCode = []
+    while seasonColumn != 0 and seasonColumn != 1:
+        seasonColumn = int(input("Would you like to add a column for seasonal codes?: "))
+
     if percentageChg == 1:
         # Returns the dataframe with period over period calculations performed.
         dataFrame = periodOverPeriodCalculation(dataFrame)
     if labelAdd == 1:
-        # Gets the group labels using the BLS_Request library.
-        BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("pcInd","groupLabels")
-        # Gets the item labels using the BLS_Request library.
-        BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("pcLRef","labels")
-        # Creates the paths for the for the item labels and the group labels
-        newPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("pcLRef",BLS_Request.getAllFilesInDirectory("pcLRef")))
-        newGroupPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("pcInd",BLS_Request.getAllFilesInDirectory("pcInd")))
-        # Modifies the row headers for the two data frames.
-        newGroupFrame = changeRowHeaders(readParquet(newGroupPath)).drop([0])
-        newDataFrame = changeRowHeaders(readParquet(newPath)).drop([0]) 
-        # Merges the two dataframes using a left join.
-        mergeLeft = pd.merge(left=newGroupFrame,right=newDataFrame,how='left',left_on='industry_code',right_on='industry_code')
-        # Iterates through the rows by the dataframe index.
-        for row in dataFrame.index:
-            # gets the series_id from each row
-            columnRow = dataFrame["series_id"][row]
-            # adds the seasonal letter to the seasonal array
-            seasonal.append(columnRow[2:3])
-            groupCode.append(columnRow[3:9])
-            itemCode.append(columnRow[9:])
-        # Checks if the seasonColumn is wanted
-        if seasonColumn == 1:
-            # Attachs the season column.
-            dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+1),"seasonal", seasonal, True)
-        # Attachs the group code to the dataframe
-        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+1),"industry_code",groupCode,True)
-        # Attachs the item code to the dataframe
-        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+2),"product_code",itemCode,True)
-        # Performs a left join on the dataframe and the mergeLeft dataframe to add the labels. 
-        dataFrame = pd.merge(left=dataFrame,right=mergeLeft,how='left',left_on=['industry_code','product_code'],right_on=['industry_code','product_code'])
-        # Gets the list of headers
-        listOfHeaders = list(dataFrame.columns)
-        # Sets the item at the group_name index to item_code
-        listOfHeaders[listOfHeaders.index("industry_name")] = "product_code"
-        # Sets the item at the item_code index to group_name
-        listOfHeaders[listOfHeaders.index("product_code")] = "industry_name"
-        # Reindexes the dataframe based on the modified list of headers.
-        dataFrame = dataFrame.reindex(columns=listOfHeaders)
+        dataFrame = labelToAdd(dataFrame,seasonColumn,percentageChg)
     elif codeSplit == 1:
-        # Iterates through the rows by the dataframe index.
-        for row in dataFrame.index:
-            # gets the series_id from each row
-            columnRow = dataFrame["series_id"][row]
-            # adds the seasonal letter to the seasonal array
-            seasonal.append(columnRow[2:3])
-            groupCode.append(columnRow[3:9])
-            itemCode.append(columnRow[9:])
-        # Checks if the seasonColumn is wanted
-        if seasonColumn == 1:
-            # Attachs the season column to the dataframe
-            dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+1),"seasonal", seasonal, True)
-        # Attachs the group code to the dataframe
-        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+1),"industry_code",groupCode,True)
-        # Attachs the item code to the dataframe
-        dataFrame.insert((dataFrame.columns.get_loc("value")+percentageChg+seasonColumn+2),"product_code",itemCode,True)
+        dataFrame = labelToAdd(dataFrame,seasonColumn,percentageChg)
     # Checks if the quartised or yearified functions haven't been used and the dataframe is in standard period format.
     if avgOverQrt == 0 and avgOverYear == 0:
         # Check if m13 is to be dropped
         if m13Drop == 1:
             # Drops all entries that have a period equal to M13 from the dataframe
-            dataFrame = dataFrame[dataFrame.period != "M13"]
+            dataFrame = dropM13(dataFrame)
         # Checks if the user wants the time formatted in yyyy-mm-01 format.
         if timeFormat == 1:
-            # Initialises an array for the formatted time.
-            formattedTime = []
-            # Iterates through the dataframe by index.
-            for row in dataFrame.index:
-                # Formats the time period based on the parameters and appends it to the formatted time array.
-                formattedTime.append(formatTimePeriod(dataFrame["year"][row],dataFrame["period"][row]))
-            # Attachs the formatted_time array to the dataframe.
-            dataFrame.insert(1,"formatted_time",formattedTime,True)
-            # Drops the year and period columns as formatted time replaces them.
-            dataFrame = dataFrame.drop(['year','period'],axis=1)
+            dataFrame = formatTimeFunc(dataFrame)
     # Asks the user if they want the dataframe converted into narrow format.
     dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
+    while dataFrameMelting != 0 and dataFrameMelting != 1:
+        dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
     if dataFrameMelting == 1:
         # Returns the melted dataframe.
         return wideFormat(dataFrame,avgOverQrt,avgOverYear,timeFormat,percentageChg,yearOverYearBool)
     else:
         return dataFrame
+
+def dropM13(dataFrame):
+    return dataFrame[dataFrame.period != "M13"]
+
+def formatTimeFunc(dataFrame):
+    # Iterates through the dataframe by index.
+    dataFrame['period'] = dataFrame["period"].str.replace('M',"")
+    dataFrame.year = formatTimePeriod(dataFrame.year,dataFrame.period)
+    # Renames the year column to formatted_time
+    dataFrame = dataFrame.rename(columns={"year": "formatted_time"})
+    return dataFrame.drop(['period'],axis=1)    
+
+def labelToAdd(dataFrame,seasonColumn,percentageChg):
+    # Gets the group labels using the BLS_Request library.
+    BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("pcInd","groupLabels")
+    # Gets the item labels using the BLS_Request library.
+    BLS_Request.compareLatestOnlineVersionWithLatestDownloadedVersion("pcLRef","labels")
+    # Creates the paths for the for the item labels and the group labels
+    newPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("pcLRef",BLS_Request.getAllFilesInDirectory("pcLRef")))
+    newGroupPath = os.path.join(path,'RawData',BLS_Request.getLatestVersionFileName("pcInd",BLS_Request.getAllFilesInDirectory("pcInd")))
+    # Modifies the row headers for the two data frames.
+    newGroupFrame = changeRowHeaders(readParquet(newGroupPath)).drop([0])
+    newDataFrame = changeRowHeaders(readParquet(newPath)).drop([0]) 
+    # Merges the two dataframes using a left join.
+    mergeLeft = pd.merge(left=newGroupFrame,right=newDataFrame,how='left',left_on='industry_code',right_on='industry_code')
+    mergeLeft["combinedCodes"] = mergeLeft["industry_code"] + mergeLeft["product_code"]
+    dataFrame["combinedCodes"] = dataFrame["series_id"].str[3:]
+    # Performs a left join on the dataframe and the mergeLeft dataframe to add the labels. 
+    dataFrame = pd.merge(left=dataFrame,right=mergeLeft,how='left',left_on="combinedCodes",right_on="combinedCodes")
+    return dataFrame.drop(['combinedCodes'],axis=1) 
 
 # Converts the standard dataframe into the wide format.
 def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
