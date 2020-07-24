@@ -4,9 +4,6 @@ import pyarrow.parquet as pq
 import pandas as pd
 import csv
 
-import time
-import cProfile
-
 #path: Dynamic path which is the current directory where the wp.py program is located.
 path = str(os.path.dirname(os.path.realpath(__file__)))
 #QuartersArr: Contains the quarters used in the quartising function. 
