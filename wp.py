@@ -3,7 +3,7 @@ import os
 import pyarrow.parquet as pq
 import pandas as pd
 import csv
-
+import numpy as np
 #path: Dynamic path which is the current directory where the wp.py program is located.
 path = str(os.path.dirname(os.path.realpath(__file__)))
 #QuartersArr: Contains the quarters used in the quartising function. 
@@ -150,7 +150,13 @@ def arrayAvg(arr):
 # periodOverPeriodCalculation: Calculates the difference between consecutive time periods
 def periodOverPeriodCalculation(dataFrame):
     dataFrame['value'] = dataFrame['value'].astype(float)
-    dataFrame['percent_change'] = dataFrame.groupby("series_id")['value'].diff()
+    dataFrame['percent_change'] = np.nan
+    dataFrame = dataFrame.groupby("series_id").apply(periodCalc)
+    return dataFrame
+
+# periodCalc: Calculates the percent difference between every row in the grouped dataframe
+def periodCalc(dataFrame):
+    dataFrame['percent_change'] = (100*(dataFrame["value"].div(dataFrame["value"].shift(periods=1))-1))
     return dataFrame
 
 # Makes the dataframe from monthly (period based) into year based ones.
