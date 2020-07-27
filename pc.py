@@ -2,6 +2,7 @@ import BLS_Request
 import os
 import pyarrow.parquet as pq
 import pandas as pd
+import numpy as np
 import csv
 #path: Dynamic path which is the current directory where the pc.py program is located.
 path = str(os.path.dirname(os.path.realpath(__file__)))
@@ -65,7 +66,7 @@ def yearOverYearCalculation(dataFrame,dropM13):
         for i in range(0,len(dataFrame)):
             yearOverYear.append("")
         # Attaches the new yearOverYear column to the current dataFrame.
-        dataFrame.insert(3,"yearOverYear",yearOverYear,True)
+        dataFrame.insert(3,"year_over_year",yearOverYear,True)
         # Groups the content of the dataframe by the series_id
         grouped = dataFrame.groupby("series_id")
         # Initialises the new dataframe
@@ -90,7 +91,7 @@ def yearOverYearCalculation(dataFrame,dropM13):
                 # Adds the modified tempGroup row to the newDF
                 newDF.append(i)
         # Creates a new dataframe from the newDF 2d array.
-        newFrame = pd.DataFrame(newDF,columns=["series_id","year","period","footnote_code","value","yearOverYear"])
+        newFrame = pd.DataFrame(newDF,columns=["series_id","year","period","footnote_code","value","year_over_year"])
         # Sorts the new dataframe.
         newFrame = newFrame.sort_values(by=["series_id","year"])
         return newFrame
@@ -149,7 +150,13 @@ def arrayAvg(arr):
 # periodOverPeriodCalculation: Calculates the difference between consecutive time periods
 def periodOverPeriodCalculation(dataFrame):
     dataFrame['value'] = dataFrame['value'].astype(float)
-    dataFrame['percent_change'] = dataFrame.groupby("series_id")['value'].diff()
+    dataFrame['percent_change'] = np.nan
+    dataFrame = dataFrame.groupby("series_id").apply(periodCalc)
+    return dataFrame
+
+# periodCalc: Calculates the percent difference between every row in the grouped dataframe
+def periodCalc(dataFrame):
+    dataFrame['percent_change'] = (100*(dataFrame["value"].div(dataFrame["value"].shift(periods=1))-1))
     return dataFrame
 
 # Makes the dataframe from monthly (period based) into year based ones.
@@ -355,8 +362,8 @@ def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
             valuesForDF.append("percent_change")
         if yearToDrop == 1:
             # Adds the year over year column to the dropped column list and the value list
-            toDropFromDataframe.append("yearOverYear")
-            valuesForDF.append("yearOverYear")
+            toDropFromDataframe.append("year_over_year")
+            valuesForDF.append("year_over_year")
         # Pivots the dataframe based on the values list.
         df = dataframe.pivot(index="series_id",columns="formatted_time",values=valuesForDF)
         # Drops the columns that are in the toDrop list
@@ -381,8 +388,8 @@ def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
             valuesForDF.append("percent_change")
         if yearToDrop == 1:
             # Adds the year over year column to the dropped column list and the value list
-            toDropFromDataframe.append("yearOverYear")
-            valuesForDF.append("yearOverYear")
+            toDropFromDataframe.append("year_over_year")
+            valuesForDF.append("year_over_year")
         # Pivots the dataframe based on the values list.
         df = dataframe.pivot_table(index="series_id",columns=["year","period"],values=valuesForDF,aggfunc='first')
         # Drops the columns that are in the toDrop list
