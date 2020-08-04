@@ -82,7 +82,6 @@ def getBLSFormatted():
     dataFrame = pd.merge(left=dataFrame,right=blsDF,how='left',left_on="combinedCodes",right_on="combinedCodes")
     dataFrame = dataFrame.drop(['combinedCodes',"year","period","value","footnote_codes"],axis=1)    
     dataFrame = dataFrame.drop_duplicates()
-    print(dataFrame)
     return dataFrame
 
 def removeComprise(string):
@@ -121,6 +120,19 @@ def prepStringNotInRow(string):
     string = string.replace("  "," ")
     return string
 
+def checksForGPE(string):
+    doc = nlp(string)
+    cutWords = ["rv", "subprimal cuts"]
+    containsGPE = False
+    for ent in doc.ents:
+        if ent.label_ == "LOC" and ent.text not in cutWords:
+            #print(string + " (" + ent.text + ") " + " CONTAINS LOC")
+            containsGPE = True
+    if containsGPE == False:
+        return string
+    else:
+        return 0
+
 def findMostSimilar(childDictionary, comparision_term):
     mostSimilarVectorCode = ""
     mostSimilarVectorValue = 0
@@ -129,10 +141,7 @@ def findMostSimilar(childDictionary, comparision_term):
         if temp > mostSimilarVectorValue:
             mostSimilarVectorValue = temp
             mostSimilarVectorCode = childDictionary[i]
-
-    # Set dictionary to what the child dictionary of the most similar term is.
     return mostSimilarVectorCode
-
 
 nlp = spacy.load("en_core_web_lg")
 NAPCSdf = readNAPCS()
@@ -171,24 +180,28 @@ blsDF["code_1_name"] = blsDF["code_1_name"].astype(str)
 blsDF["code_2_name"] = blsDF["code_2_name"].astype(str)
 resultFrame = []
 for blsRows in blsDF.iterrows(): 
-    string = blsRows[1]["code_1_name"] + " " + blsRows[1]["code_2_name"]
-    string = prepStringNotInRow(string)
-    string = convertToVector(string)
-    currentRow = firstRow
-    currentNode = ""
-    while isinstance(currentRow,dict):
-        currentRow = findMostSimilar(currentRow, string)
-        if currentRow != "":
-            currentNode = currentRow
-            currentRow = currentRow.children
-    resultFrame.append([currentNode.code,blsRows[1]["series_id"]])
-
+    string = blsRows[1]["code_2_name"]
+    string = checksForGPE(prepStringNotInRow(string))
+    if string != 0:
+        string = convertToVector(string)
+        currentRow = firstRow
+        currentNode = ""
+        while isinstance(currentRow,dict):
+            currentRow = findMostSimilar(currentRow, string)
+            if currentRow != "":
+                currentNode = currentRow
+                currentRow = currentRow.children
+        if currentNode != "":
+            resultFrame.append([currentNode.code,blsRows[1]["series_id"],(1 - spatial.distance.cosine(currentNode.vector, string))])
+        else:
+            resultFrame.append(["NO MATCH",blsRows[1]["series_id"],0])
 
 NAPCSdf = NAPCSdf.drop(['Level','Hierarchical structure'],axis=1)
 blsDF = blsDF.drop(['code_1','code_2'],axis=1)
-tempDF = pd.DataFrame(resultFrame,columns=["Code","series_id"])
+tempDF = pd.DataFrame(resultFrame,columns=["Code","series_id","similarity"])
 fullDF = pd.merge(tempDF,blsDF, on="series_id")
 fullDF = pd.merge(fullDF,NAPCSdf, on="Code")
+fullDF = fullDF.rename(columns={"series_id":"BLS Series ID","Code":"NACPS Code", "similarity":"Similarity","code_1_name":"Industry/Group Name","code_2_name":"Product/Item Name"})
+fullDF = fullDF.sort_values(by="Similarity", ascending=False)
 newPath = os.path.join(path,"help.csv")
 fullDF.to_csv(newPath, index=False)
-    
