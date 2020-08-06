@@ -16,6 +16,7 @@ class node:
 
 path = str(os.path.dirname(os.path.realpath(__file__)))
 punctuations = '''!()-[]{};:'"\,<>./?@#$%^&*_~'''
+exceptionWords = ["excluding","except", "other_than","not","Inputs"]
 def readNAPCS():
     filePath = os.path.join(path,"NAPCS-SCPAN-2017-Structure-V1-eng.csv")
     return pd.read_csv(filePath,encoding="iso8859_15")
@@ -97,8 +98,33 @@ def convertToVector(string):
         c += token.vector
     return c
 
+def removeExceptions(inputString):
+    if "Input to stage" in inputString:
+        string = string.replace("Input to stage ","")
+        string = string[2:]
+    startIndex = 0
+    endIndex = 0
+    splitStr = inputString.split()
+    for i in splitStr:
+        if i in exceptionWords:
+            startIndex = splitStr.index(i)
+            for j in range(startIndex,len(splitStr)):
+                if "." in splitStr[j] or "," in splitStr[j]:
+                    endIndex = j
+                    break
+        if startIndex != 0 and endIndex != 0:
+            del splitStr[startIndex:endIndex+1]
+            startIndex = 0 
+            endIndex = 0
+    return inputString
+
 def prepString(rows):
-    string = removeComprise(rows["Class title"]) + " " + removeComprise(rows["Class definition"])
+    string = removeComprise(rows["Class definition"])
+    string = string.replace("mfg","manufacturing")
+    string = string.replace(", n.e.c.",".")
+    string = string.replace("other than","other_than")
+    if any(word in string for word in exceptionWords):
+        string = removeExceptions(string)
     string = re.sub("[\(\[].*?[\)\]]", "", string)
     string = string.lower()
     for i in string:
@@ -107,9 +133,15 @@ def prepString(rows):
     string = string.split(" ")
     string = " ".join(list(dict.fromkeys(string)))
     string = string.replace("  "," ")
+    #print("PROCESSED STRING : " + str(string))
     return string
 
 def prepStringNotInRow(string):
+    string = string.replace("mfg","manufacturing")
+    string = string.replace(", n.e.c.",".")
+    string = string.replace("other than","other_than")
+    if any(word in string for word in exceptionWords):
+        string = removeExceptions(string)
     string = re.sub("[\(\[].*?[\)\]]", "", string)
     string = string.lower()
     for i in string:
@@ -118,6 +150,7 @@ def prepStringNotInRow(string):
     string = string.split(" ")
     string = " ".join(list(dict.fromkeys(string)))
     string = string.replace("  "," ")
+    #print("PROCESSED STRING : " + str(string))
     return string
 
 def checksForGPE(string):
