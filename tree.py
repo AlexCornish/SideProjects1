@@ -16,7 +16,7 @@ class node:
 
 path = str(os.path.dirname(os.path.realpath(__file__)))
 punctuations = '''!()-[]{};:'"\,<>./?@#$%^&*_~'''
-exceptionWords = ["excluding","except", "other_than","not","Inputs"]
+exceptionWords = ["excluding","except", "other_than","not"]
 def readNAPCS():
     filePath = os.path.join(path,"NAPCS-SCPAN-2017-Structure-V1-eng.csv")
     return pd.read_csv(filePath,encoding="iso8859_15")
@@ -99,23 +99,11 @@ def convertToVector(string):
     return c
 
 def removeExceptions(inputString):
-    if "Input to stage" in inputString:
-        string = string.replace("Input to stage ","")
-        string = string[2:]
-    startIndex = 0
-    endIndex = 0
-    splitStr = inputString.split()
-    for i in splitStr:
-        if i in exceptionWords:
-            startIndex = splitStr.index(i)
-            for j in range(startIndex,len(splitStr)):
-                if "." in splitStr[j] or "," in splitStr[j]:
-                    endIndex = j
-                    break
-        if startIndex != 0 and endIndex != 0:
-            del splitStr[startIndex:endIndex+1]
-            startIndex = 0 
-            endIndex = 0
+    if "Inputs to stage" in inputString:
+        inputString = inputString[17:]
+    for i in exceptionWords:
+        if i in inputString:
+            inputString = inputString.split(i)[0]
     return inputString
 
 def prepString(rows):
@@ -123,8 +111,7 @@ def prepString(rows):
     string = string.replace("mfg","manufacturing")
     string = string.replace(", n.e.c.",".")
     string = string.replace("other than","other_than")
-    if any(word in string for word in exceptionWords):
-        string = removeExceptions(string)
+    string = removeExceptions(string)
     string = re.sub("[\(\[].*?[\)\]]", "", string)
     string = string.lower()
     for i in string:
@@ -133,15 +120,13 @@ def prepString(rows):
     string = string.split(" ")
     string = " ".join(list(dict.fromkeys(string)))
     string = string.replace("  "," ")
-    #print("PROCESSED STRING : " + str(string))
     return string
 
 def prepStringNotInRow(string):
     string = string.replace("mfg","manufacturing")
     string = string.replace(", n.e.c.",".")
     string = string.replace("other than","other_than")
-    if any(word in string for word in exceptionWords):
-        string = removeExceptions(string)
+    string = removeExceptions(string)
     string = re.sub("[\(\[].*?[\)\]]", "", string)
     string = string.lower()
     for i in string:
@@ -150,7 +135,6 @@ def prepStringNotInRow(string):
     string = string.split(" ")
     string = " ".join(list(dict.fromkeys(string)))
     string = string.replace("  "," ")
-    #print("PROCESSED STRING : " + str(string))
     return string
 
 def checksForGPE(string):
@@ -159,7 +143,6 @@ def checksForGPE(string):
     containsGPE = False
     for ent in doc.ents:
         if ent.label_ == "LOC" and ent.text not in cutWords:
-            #print(string + " (" + ent.text + ") " + " CONTAINS LOC")
             containsGPE = True
     if containsGPE == False:
         return string
@@ -227,14 +210,15 @@ for blsRows in blsDF.iterrows():
         if currentNode != "":
             resultFrame.append([currentNode.code,blsRows[1]["series_id"],(1 - spatial.distance.cosine(currentNode.vector, string))])
         else:
-            resultFrame.append(["NO MATCH",blsRows[1]["series_id"],0])
+            resultFrame.append(["NO MATCH",blsRows[1]["series_id"],"0"])
 
 NAPCSdf = NAPCSdf.drop(['Level','Hierarchical structure'],axis=1)
 blsDF = blsDF.drop(['code_1','code_2'],axis=1)
 tempDF = pd.DataFrame(resultFrame,columns=["Code","series_id","similarity"])
 fullDF = pd.merge(tempDF,blsDF, on="series_id")
 fullDF = pd.merge(fullDF,NAPCSdf, on="Code")
-fullDF = fullDF.rename(columns={"series_id":"BLS Series ID","Code":"NACPS Code", "similarity":"Similarity","code_1_name":"Industry/Group Name","code_2_name":"Product/Item Name"})
+fullDF = fullDF.rename(columns={"series_id":"BLS Series ID","Code":"NACPS Code", "similarity":"Similarity","code_1_name":"BLS Industry/Group Name","code_2_name":"BLS Product/Item Name","Class title":"NAPCS Class title","Class definition":"NAPCS Class definition"})
 fullDF = fullDF.sort_values(by="Similarity", ascending=False)
-newPath = os.path.join(path,"help.csv")
-fullDF.to_csv(newPath, index=False)
+newPath = os.path.join(path,"result.csv")
+fullDF = fullDF.applymap(str)
+fullDF.to_csv(newPath, index=False)  
