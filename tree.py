@@ -6,6 +6,7 @@ import spacy
 import numpy as np
 import BLS_Request
 from scipy import spatial
+
 class node:
     def __init__(self, code, vector, children):
         self.code = code
