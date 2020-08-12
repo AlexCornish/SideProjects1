@@ -139,7 +139,7 @@ def convertToVector(string):
         c += token.vector
     return c
 
-nlp = spacy.load("en_core_web_lg")
+nlp = spacy.load(os.path.expanduser("~/anaconda3/Lib/site-packages/en_core_web_lg/en_core_web_lg-2.3.1"))
 tempDF = readNAPCS()
 tempDF["Code"] = tempDF["Code"].astype(str)
 blsDF = getBLSFormatted()
@@ -151,3 +151,17 @@ if preProcessingBool == 1:
 else:
     tempDF["vector"] = tempDF["Class definition"].map(convertToVector)
     blsDF["vector"] = blsDF["code_2_name"].map(convertToVector)
+
+while True:
+    blsORNAPCS = str(input("Is the code that you want to compare BLS or NAPCS? "))
+    while blsORNAPCS != "BLS" and blsORNAPCS != "NAPCS":
+        blsORNAPCS = str(input("Is the code that you want to compare BLS or NAPCS? "))
+    compareCode = str(input("Please enter the code here: "))
+    nearestAmount = int(input("Please enter the number of nearest matches that you would like to see here: "))
+    if blsORNAPCS == "BLS":
+        print(nNearestBLStoNAPCS(compareCode, nearestAmount))
+    else:
+        print(nNearestNAPCStoBLS(compareCode, nearestAmount))
+    compareAgain = int(input("Would you like to compare another code? (1 for Yes, 0 for No)"))
+    if compareAgain == 0:
+        break
