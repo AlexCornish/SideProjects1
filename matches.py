@@ -10,7 +10,6 @@ path = str(os.path.dirname(os.path.realpath(__file__)))
 punctuations = '''!()-[]{};:'"\,<>./?@#$%^&*_~'''
 exceptionWords = ["excluding","except", "other_than","not"]
 
-
 #Reads a parquet file and turns it into pyarrow table, then .to_pandas() converts the table to a dataframe.
 def readParquet(fileName):
     # - fileName: (String) The name of the parquet file to be read and converted from parquet to pandas.
@@ -114,21 +113,41 @@ def prepString(rows):
     return c
 
 def nNearestBLStoNAPCS(blsNumber, numberToReturn):
-    dataFrame = comparison(blsNumber)
+    dataFrame = comparisonBLS(blsNumber)
     dataFrame = dataFrame.sort_values(by="similarity", ascending=False)
     return dataFrame.head(numberToReturn)
     
-def comparison(blsNumber):
+def nNearestNAPCStoBLS(napcsNumber, numberToReturn):
+    dataFrame = comparisonNAPCS(napcsNumber)
+    dataFrame = dataFrame.sort_values(by="similarity", ascending=False)
+    return dataFrame.head(numberToReturn)
+
+def comparisonBLS(blsNumber):
     tempBLS = blsDF.loc[blsDF.series_id == blsNumber,"vector"].tolist()[0]
     tempDF["similarity"] = tempDF["vector"].apply(lambda x: 1 - spatial.distance.cosine(x, tempBLS))
     return tempDF
 
+def comparisonNAPCS(NAPCSNumber):
+    tempNAPCS = tempDF.loc[tempDF.Code == NAPCSNumber,"vector"].tolist()[0]
+    blsDF["similarity"] = blsDF["vector"].apply(lambda x: 1 - spatial.distance.cosine(x, tempNAPCS))
+    return blsDF
+
+def convertToVector(string):
+    doc = nlp(string)
+    c = np.zeros([300])
+    for token in doc:
+        c += token.vector
+    return c
+
 nlp = spacy.load("en_core_web_lg")
 tempDF = readNAPCS()
-tempDF["vector"] = tempDF["Class definition"].map(prepString)
+tempDF["Code"] = tempDF["Code"].astype(str)
 blsDF = getBLSFormatted()
 blsDF["code_2_name"] = blsDF["code_2_name"].astype(str)
-blsDF["vector"] = blsDF["code_2_name"].map(prepString)
-
-dataFrame = nNearestBLStoNAPCS("PCU311511311511A",20)
-print(dataFrame)
+preProcessingBool = int(input("Would you like to preprocess the labels before comparison? (0 for NO, 1 for YES): "))
+if preProcessingBool == 1:
+    tempDF["vector"] = tempDF["Class definition"].map(prepString)
+    blsDF["vector"] = blsDF["code_2_name"].map(prepString)
+else:
+    tempDF["vector"] = tempDF["Class definition"].map(convertToVector)
+    blsDF["vector"] = blsDF["code_2_name"].map(convertToVector)
