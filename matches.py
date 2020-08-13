@@ -5,6 +5,9 @@ import BLS_Request
 import spacy
 import pyarrow.parquet as pq
 import numpy as np
+import cProfile
+import pyarrow as pa
+import time
 from scipy import spatial
 path = str(os.path.dirname(os.path.realpath(__file__)))
 punctuations = '''!()-[]{};:'"\,<>./?@#$%^&*_~'''
@@ -58,7 +61,6 @@ def mainDF():
     dataFrame["combinedCodes"] = dataFrame["series_id"].str[3:]
     return dataFrame
 
-
 def getBLSFormatted():
     blsDF = createBLSDataFrame()
     dataFrame = mainDF()
@@ -103,9 +105,10 @@ def prepString(rows):
     for i in string:
         if i in punctuations:
             string = string.replace(i,"")
-    string = string.split(" ")
-    string = " ".join(list(dict.fromkeys(string)))
     string = string.replace("  "," ")
+    return convertToVector(string)
+
+def convertToVector(string):
     doc = nlp(string)
     c = np.zeros([300])
     for token in doc:
@@ -132,36 +135,66 @@ def comparisonNAPCS(NAPCSNumber):
     blsDF["similarity"] = blsDF["vector"].apply(lambda x: 1 - spatial.distance.cosine(x, tempNAPCS))
     return blsDF
 
-def convertToVector(string):
-    doc = nlp(string)
-    c = np.zeros([300])
-    for token in doc:
-        c += token.vector
-    return c
-
-nlp = spacy.load(os.path.expanduser("~/anaconda3/Lib/site-packages/en_core_web_lg/en_core_web_lg-2.3.1"))
-tempDF = readNAPCS()
-tempDF["Code"] = tempDF["Code"].astype(str)
-blsDF = getBLSFormatted()
-blsDF["code_2_name"] = blsDF["code_2_name"].astype(str)
-preProcessingBool = int(input("Would you like to preprocess the labels before comparison? (0 for NO, 1 for YES): "))
-if preProcessingBool == 1:
-    tempDF["vector"] = tempDF["Class definition"].map(prepString)
-    blsDF["vector"] = blsDF["code_2_name"].map(prepString)
-else:
-    tempDF["vector"] = tempDF["Class definition"].map(convertToVector)
-    blsDF["vector"] = blsDF["code_2_name"].map(convertToVector)
-
-while True:
-    blsORNAPCS = str(input("Is the code that you want to compare BLS or NAPCS? "))
-    while blsORNAPCS != "BLS" and blsORNAPCS != "NAPCS":
+def main():
+    while True:
         blsORNAPCS = str(input("Is the code that you want to compare BLS or NAPCS? "))
-    compareCode = str(input("Please enter the code here: "))
-    nearestAmount = int(input("Please enter the number of nearest matches that you would like to see here: "))
-    if blsORNAPCS == "BLS":
-        print(nNearestBLStoNAPCS(compareCode, nearestAmount))
+        while blsORNAPCS != "BLS" and blsORNAPCS != "NAPCS":
+            blsORNAPCS = str(input("Is the code that you want to compare BLS or NAPCS? "))
+        compareCode = str(input("Please enter the code here: "))
+        nearestAmount = int(input("Please enter the number of nearest matches that you would like to see here: "))
+        if blsORNAPCS == "BLS":
+            print(nNearestBLStoNAPCS(compareCode, nearestAmount))
+        else:
+            print(nNearestNAPCStoBLS(compareCode, nearestAmount))
+        compareAgain = int(input("Would you like to compare another code? (1 for Yes, 0 for No)"))
+        if compareAgain == 0:
+            break
+
+def vectorStoragePathCreation():
+    newPath = os.path.join(path,'RawData')
+    # Checks if "newPath" exists and creates it if it doesn't
+    if not os.path.exists(newPath):
+        os.makedirs(newPath)
+    vectorTableStoragePath = os.path.join(newPath,'VectorTables')
+    # Checks if "newPath" exists and creates it if it doesn't
+    if not os.path.exists(vectorTableStoragePath):
+        os.makedirs(vectorTableStoragePath)
+    return vectorTableStoragePath
+
+def checkForBLS(path):
+    blsPath = os.path.join(path,'BLSVectors.parquet')
+    if not os.path.exists(blsPath):
+        print("Current BLSVector.parquet not found. Creating new BLSVector.parquet...")
+        blsDF = getBLSFormatted()
+        blsDF["code_2_name"] = blsDF["code_2_name"].astype(str)
+        blsDF["vector"] = blsDF["code_2_name"].map(prepString)
+        blsDF = blsDF.drop(columns=["code_1","code_2"])
+        table = pa.Table.from_pandas(blsDF)
+        pq.write_table(table,blsPath)
+        print("BLSVector.parquet created...")
+        return blsDF
     else:
-        print(nNearestNAPCStoBLS(compareCode, nearestAmount))
-    compareAgain = int(input("Would you like to compare another code? (1 for Yes, 0 for No)"))
-    if compareAgain == 0:
-        break
+        print("BLSVector.parquet found...")
+        return pq.read_table(blsPath).to_pandas()
+
+def checkForNAPCS(path):
+    napcsPath = os.path.join(path,'NAPCSVectors.parquet')
+    if not os.path.exists(napcsPath):
+        print("Current NAPCSVectors.parquet not found. Creating new NAPCSVectors.parquet...")
+        napcsDF = readNAPCS()
+        napcsDF["Code"] = napcsDF["Code"].astype(str)
+        napcsDF = napcsDF[napcsDF["Level"]==4]
+        napcsDF["vector"] = napcsDF["Class definition"].map(prepString)
+        napcsDF = napcsDF.drop(columns=["Level","Hierarchical structure"])
+        table = pa.Table.from_pandas(napcsDF)
+        pq.write_table(table,napcsPath)
+        print("NAPCSVectors.parquet created...")
+        return napcsDF
+    else:
+        print("NAPCSVectors.parquet found...")
+        return pq.read_table(napcsPath).to_pandas()
+
+vectorStoragePath = vectorStoragePathCreation()
+nlp = spacy.load(os.path.expanduser("~/anaconda3/Lib/site-packages/en_core_web_lg/en_core_web_lg-2.3.1"))
+blsDF = checkForBLS(vectorStoragePath)
+tempDF = checkForNAPCS(vectorStoragePath)
