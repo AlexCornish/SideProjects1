@@ -206,6 +206,7 @@ def checkForNAPCS(path):
         return pq.read_table(napcsPath).to_pandas()
 
 vectorStoragePath = vectorStoragePathCreation()
-nlp = spacy.load(os.path.expanduser("~/anaconda3/Lib/site-packages/en_core_web_lg/en_core_web_lg-2.3.1"))
+#nlp = spacy.load(os.path.expanduser("~/anaconda3/Lib/site-packages/en_core_web_lg/en_core_web_lg-2.3.1"))
+nlp = spacy.load("en_core_web_lg")
 blsDF = checkForBLS(vectorStoragePath)
 tempDF = checkForNAPCS(vectorStoragePath)
