@@ -259,9 +259,9 @@ def createCustomFormattedDataFrame(dataFrame):
         if timeFormat == 1:
             dataFrame = formatTimeFunc(dataFrame)
     # Asks the user if they want the dataframe converted into narrow format.
-    dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
+    dataFrameMelting = int(input("Would you like the data in Narrow Format? (1 for narrow, 0 for wide): "))
     while dataFrameMelting != 0 and dataFrameMelting != 1:
-        dataFrameMelting = int(input("Would you like the data in Narrow Format(1 for yes, 0 for no)?: "))
+        dataFrameMelting = int(input("Would you like the data in Narrow Format? (1 for narrow, 0 for wide): "))
     if dataFrameMelting == 0:
         # Returns the melted dataframe.
         return wideFormat(dataFrame,avgOverQrt,avgOverYear,timeFormat,percentageChg,yearOverYearBool)

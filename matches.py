@@ -8,6 +8,7 @@ import numpy as np
 import cProfile
 import pyarrow as pa
 import time
+from IPython.display import display, HTML
 from scipy import spatial
 path = str(os.path.dirname(os.path.realpath(__file__)))
 punctuations = '''!()-[]{};:'"\,<>./?@#$%^&*_~'''
@@ -118,20 +119,30 @@ def convertToVector(string):
 def nNearestBLStoNAPCS(blsNumber, numberToReturn):
     dataFrame = comparisonBLS(blsNumber)
     dataFrame = dataFrame.sort_values(by="similarity", ascending=False)
-    return dataFrame.head(numberToReturn)
+    dataFrame = dataFrame.head(numberToReturn)
+    dataFrame = dataFrame.drop(columns=["Class title", "vector"])
+    dataFrame = dataFrame.reset_index(drop=True)
+    return dataFrame
     
 def nNearestNAPCStoBLS(napcsNumber, numberToReturn):
     dataFrame = comparisonNAPCS(napcsNumber)
     dataFrame = dataFrame.sort_values(by="similarity", ascending=False)
-    return dataFrame.head(numberToReturn)
+    dataFrame = dataFrame.head(numberToReturn)
+    dataFrame = dataFrame.drop(columns=["vector"])
+    dataFrame = dataFrame.reset_index(drop=True)
+    return dataFrame
 
 def comparisonBLS(blsNumber):
     tempBLS = blsDF.loc[blsDF.series_id == blsNumber,"vector"].tolist()[0]
+    blsDFRes = blsDF[blsDF["series_id"]==blsNumber].values.tolist()[0]
+    print(blsDFRes[0] + ":      " + blsDFRes[1] + "    " + blsDFRes[2])
     tempDF["similarity"] = tempDF["vector"].apply(lambda x: 1 - spatial.distance.cosine(x, tempBLS))
     return tempDF
 
 def comparisonNAPCS(NAPCSNumber):
     tempNAPCS = tempDF.loc[tempDF.Code == NAPCSNumber,"vector"].tolist()[0]
+    tempDFRes = tempDF[tempDF["Code"]==NAPCSNumber].values.tolist()[0]
+    print(tempDFRes[0] + ":     " + tempDFRes[1] + "    " + tempDFRes[2])
     blsDF["similarity"] = blsDF["vector"].apply(lambda x: 1 - spatial.distance.cosine(x, tempNAPCS))
     return blsDF
 
@@ -143,9 +154,9 @@ def main():
         compareCode = str(input("Please enter the code here: "))
         nearestAmount = int(input("Please enter the number of nearest matches that you would like to see here: "))
         if blsORNAPCS == "BLS":
-            print(nNearestBLStoNAPCS(compareCode, nearestAmount))
+            display(nNearestBLStoNAPCS(compareCode, nearestAmount))
         else:
-            print(nNearestNAPCStoBLS(compareCode, nearestAmount))
+            display(nNearestNAPCStoBLS(compareCode, nearestAmount))
         compareAgain = int(input("Would you like to compare another code? (1 for Yes, 0 for No)"))
         if compareAgain == 0:
             break

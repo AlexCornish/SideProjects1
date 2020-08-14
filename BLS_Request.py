@@ -89,9 +89,10 @@ def compareLatestOnlineVersionWithLatestDownloadedVersion(wpOrpc,fileNameToCheck
         # newVerTime: extracts the time from the filename
         newVerTime = datetime.time(int(fileName[3]),int(fileName[4]))
         if newVerDate == downloadDate and newVerTime == downloadTime:
-            print("Latest version is already downloaded.")
+            print("No new data available (current version: " + str(downloadDate) + ")")
         else:
             # Constructs the url with whichever wpOrPc url extract is needed.
+            print("Downloading new data (previous version: " + str(downloadDate) + "; new version: " + str(newVerDate) + ")")
             url = os.path.join(BLS_BASE_URL,urlDict[wpOrpc])
             getAndFormatData(url,wpOrpc,(newVerDate,newVerTime))
     else:
