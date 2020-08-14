@@ -301,17 +301,17 @@ def labelToAdd(dataFrame,seasonColumn,percentageChg):
     return dataFrame.drop(['combinedCodes'],axis=1) 
 
 def modifyHeaders(dataFrame):
-    print(dataFrame)
     newColumns = []
     for i in dataFrame.columns:
         if isinstance(i,tuple):
             labelStr = ""
-            for j in range(0,len(i)):
-                if j == 0:
-                    labelStr += str(i[j])
-                else:
-                    labelStr += "_" + str(i[j])
-            newColumns.append(labelStr)
+            if isinstance(i[len(i)-1],str):
+                for j in range(0,len(i)):
+                    if j == 0:
+                        labelStr += str(i[j])
+                    else:
+                        labelStr += "_" + str(i[j])
+                newColumns.append(labelStr)
         else:
             newColumns.append(i)
     return newColumns

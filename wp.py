@@ -2,6 +2,7 @@ import BLS_Request
 import os
 import pyarrow.parquet as pq
 import pandas as pd
+import math
 import csv
 import numpy as np
 #path: Dynamic path which is the current directory where the wp.py program is located.
@@ -143,17 +144,17 @@ def quarteriseDataFrame(dataFrame):
     return newDataFrame
 
 def modifyHeaders(dataFrame):
-    print(dataFrame)
     newColumns = []
     for i in dataFrame.columns:
         if isinstance(i,tuple):
             labelStr = ""
-            for j in range(0,len(i)):
-                if j == 0:
-                    labelStr += str(i[j])
-                else:
-                    labelStr += "_" + str(i[j])
-            newColumns.append(labelStr)
+            if isinstance(i[len(i)-1],str):
+                for j in range(0,len(i)):
+                    if j == 0:
+                        labelStr += str(i[j])
+                    else:
+                        labelStr += "_" + str(i[j])
+                newColumns.append(labelStr)
         else:
             newColumns.append(i)
     return newColumns
@@ -336,7 +337,7 @@ def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
             toDropFromDataframe.append("percent_change")
             valuesForDF.append("percent_change")
         # Pivots the dataframe based on the values list.
-        df = dataframe.pivot_table(index="series_id",columns=["year","quarter"],values=valuesForDF,aggfunc='first')
+        df = dataframe.pivot_table(index="series_id",columns=["reference_period"],values=valuesForDF,aggfunc='first')
         # Drops the columns that are in the toDrop list
         dataframe = dataframe.drop(columns=toDropFromDataframe)
         # Eliminates the duplicate rows from the dataframe.
