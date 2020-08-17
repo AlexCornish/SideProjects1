@@ -204,7 +204,7 @@ def yearifyDataFrame(dataFrame):
         for k in yearDict[x]:
             # Adds the new row which has the series_id, year, and averaged year value.
             newDF.append([x,k,arrayAvg(yearDict[x][k])])
-    return pd.DataFrame(newDF, columns=["series_id","year","value"])
+    return pd.DataFrame(newDF, columns=["series_id","reference_period","value"])
 
 # Takes the original dataframe information and converts in into a custom formatted dataframe.
 def createCustomFormattedDataFrame(dataFrame):
@@ -349,7 +349,7 @@ def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
     # Checks if the user has had the data formatted by years.
     elif avgYear == 1:
         # Columns to drop from the original dataframe
-        toDropFromDataframe = ["year","value"]
+        toDropFromDataframe = ["reference_period","value"]
         # Values that will be included in the wide formatting
         valuesForDF = ["value"]
         # Checks if percentage change is selected
@@ -358,7 +358,7 @@ def wideFormat(dataframe,avgQrt,avgYear,timeForm,percentageChg,yearToDrop):
             toDropFromDataframe.append("percent_change")
             valuesForDF.append("percent_change")
         # Pivots the dataframe based on the values list.
-        df = dataframe.pivot(index="series_id",columns="year",values=valuesForDF)
+        df = dataframe.pivot(index="series_id",columns="reference_period",values=valuesForDF)
         # Drops the columns that are in the toDrop list
         dataframe = dataframe.drop(columns=toDropFromDataframe)
         # Eliminates the duplicate rows from the dataframe.
