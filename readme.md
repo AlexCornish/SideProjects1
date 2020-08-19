@@ -32,3 +32,14 @@
 1. Open Jupyter notebook.
 2. Load the `matches.ipynb` file.
 3. Run the program. 
+## How to get Matches using the script:
+- The code will keep running until the "Would you like to compare another code? (1 for Yes, 0 for No)" option appears after at least one match has been made. If this option appears and the user types in 0 for No, then the program will end. 
+- Once the program has begun, the first option will appear. This first option asks if the code that you would like to compare is a BLS or NAPCS code. 
+	-  For example, if the code that you have is a BLS code, type in "BLS", the code, and the number of matches you'd like, 
+	and the program will return the nearest N NAPCS matches. 
+- Type in the code that you would like to compare.
+- Type in the number of nearest matches that you would like to see, the program will return the N nearest matches to the code that you put in. 
+- Once all of this has been entered the program will produce a table containing the following.
+	- The code, the description, and the similarity of each of the matches. 
+- After the table appears, the option to compare another code will appear.
+	- You can either choose to repeat the process again by typing in 1, or 0 to end the program.
