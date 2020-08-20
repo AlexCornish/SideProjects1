@@ -5,7 +5,6 @@ import BLS_Request
 import spacy
 import pyarrow.parquet as pq
 import numpy as np
-import cProfile
 import pyarrow as pa
 import time
 from IPython.display import display, HTML
@@ -122,6 +121,7 @@ def nNearestBLStoNAPCS(blsNumber, numberToReturn):
     dataFrame = dataFrame.head(numberToReturn)
     dataFrame = dataFrame.drop(columns=["Class title", "vector"])
     dataFrame = dataFrame.reset_index(drop=True)
+    pd.set_option('display.max_colwidth', None)
     return dataFrame
     
 def nNearestNAPCStoBLS(napcsNumber, numberToReturn):
@@ -130,6 +130,7 @@ def nNearestNAPCStoBLS(napcsNumber, numberToReturn):
     dataFrame = dataFrame.head(numberToReturn)
     dataFrame = dataFrame.drop(columns=["vector"])
     dataFrame = dataFrame.reset_index(drop=True)
+    pd.set_option('display.max_colwidth', None)
     return dataFrame
 
 def comparisonBLS(blsNumber):
@@ -151,8 +152,18 @@ def main():
         blsORNAPCS = str(input("Is the code that you want to compare BLS or NAPCS? "))
         while blsORNAPCS != "BLS" and blsORNAPCS != "NAPCS":
             blsORNAPCS = str(input("Is the code that you want to compare BLS or NAPCS? "))
+
         compareCode = str(input("Please enter the code here: "))
-        nearestAmount = int(input("Please enter the number of nearest matches that you would like to see here: "))
+        while getValidCodes(blsORNAPCS, compareCode) != True:
+            compareCode = str(input("Please enter the code here: "))
+
+        nearestAmount = input("Please enter the number of nearest matches that you would like to see here: ")
+        while nearestAmount.isdigit() != True:
+            nearestAmount = input("Please enter the number of nearest matches that you would like to see here: ")
+        nearestAmount = int(nearestAmount)
+        while nearestAmount < 0:
+            nearestAmount = input("Please enter the number of nearest matches that you would like to see here: ")
+            
         if blsORNAPCS == "BLS":
             display(nNearestBLStoNAPCS(compareCode, nearestAmount))
         else:
@@ -204,6 +215,23 @@ def checkForNAPCS(path):
     else:
         print("NAPCSVectors.parquet found...")
         return pq.read_table(napcsPath).to_pandas()
+
+def getValidCodes(blsORNAPCSvar, inputCode):
+    inputCode = inputCode.strip()
+    if blsORNAPCSvar == "BLS":
+        temp = blsDF["series_id"].tolist()
+        if inputCode in temp:
+            return True
+        else:
+            print(str(inputCode) + " is an invalid BLS Code.")
+            return False
+    else:
+        temp = tempDF["Code"].tolist()
+        if inputCode in temp:
+            return True
+        else:
+            print(str(inputCode) + " is an invalid NAPCS Code.")
+            return False
 
 vectorStoragePath = vectorStoragePathCreation()
 #nlp = spacy.load(os.path.expanduser("~/anaconda3/Lib/site-packages/en_core_web_lg/en_core_web_lg-2.3.1"))
