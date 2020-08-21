@@ -134,6 +134,7 @@ def nNearestNAPCStoBLS(napcsNumber, numberToReturn):
     return dataFrame
 
 def comparisonBLS(blsNumber):
+    blsNumber = blsNumber.strip()
     tempBLS = blsDF.loc[blsDF.series_id == blsNumber,"vector"].tolist()[0]
     blsDFRes = blsDF[blsDF["series_id"]==blsNumber].values.tolist()[0]
     print(blsDFRes[0] + ":      " + blsDFRes[1] + "    " + blsDFRes[2])
@@ -141,7 +142,9 @@ def comparisonBLS(blsNumber):
     return tempDF
 
 def comparisonNAPCS(NAPCSNumber):
-    tempNAPCS = tempDF.loc[tempDF.Code == NAPCSNumber,"vector"].tolist()[0]
+    NAPCSNumber = NAPCSNumber.strip()
+    tempNAPCS = tempDF.loc[tempDF.Code == NAPCSNumber,"vector"]
+    tempNAPCS = tempNAPCS.tolist()[0]
     tempDFRes = tempDF[tempDF["Code"]==NAPCSNumber].values.tolist()[0]
     print(tempDFRes[0] + ":     " + tempDFRes[1] + "    " + tempDFRes[2])
     blsDF["similarity"] = blsDF["vector"].apply(lambda x: 1 - spatial.distance.cosine(x, tempNAPCS))
@@ -205,7 +208,6 @@ def checkForNAPCS(path):
         print("Current NAPCSVectors.parquet not found. Creating new NAPCSVectors.parquet...")
         napcsDF = readNAPCS()
         napcsDF["Code"] = napcsDF["Code"].astype(str)
-        napcsDF = napcsDF[napcsDF["Level"]==4]
         napcsDF["vector"] = napcsDF["Class definition"].map(prepString)
         napcsDF = napcsDF.drop(columns=["Level","Hierarchical structure"])
         table = pa.Table.from_pandas(napcsDF)
