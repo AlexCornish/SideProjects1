@@ -63,9 +63,8 @@ def convertFormat(dateTimeStr):
 
 # getBLSData: Performs a GET request to get the BLS data from the specific URL.
 def getBLSData(url, wpOrpc):
-    http = urllib3.PoolManager()
-    r = http.request('GET',url)
-    tempInfo = r.data.decode("utf-8")
+    r = requests.get(url)
+    tempInfo = r.text
     tempArr = []
     tempInfo = tempInfo.splitlines()
     for j in tempInfo:
