@@ -288,9 +288,9 @@ blsDF = checkForBLS(vectorStoragePath)
 tempDF = checkForNAPCS(vectorStoragePath)
 while True:
     vectorSearchCode = ""
-    searchMethod = str(input("Which method would you like to search by exact word? (1 for Yes, 0 for No):  "))
+    searchMethod = str(input("Would you like to search by an exact word? (1 for Yes, 0 for No):  "))
     while searchMethod != "0" and searchMethod != "1":
-        searchMethod = str(input("Which method would you like to search by exact word? (1 for Yes, 0 for No):  "))  
+        searchMethod = str(input("Would you like to search by an exact word? (1 for Yes, 0 for No):  "))  
     if searchMethod == "0":
         vectorSearchCode = str(input("Enter a string to parse? "))
     display(prototypeMatch(vectorSearchCode,searchMethod))
