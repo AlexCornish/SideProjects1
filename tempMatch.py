@@ -150,6 +150,45 @@ def comparisonNAPCS(NAPCSNumber):
     blsDF["similarity"] = blsDF["vector"].apply(lambda x: 1 - spatial.distance.cosine(x, tempNAPCS))
     return blsDF
 
+def getValidCodes(blsORNAPCSvar, inputCode):
+    inputCode = inputCode.strip()
+    if blsORNAPCSvar == "BLS":
+        temp = blsDF["series_id"].tolist()
+        if inputCode in temp:
+            return True
+        else:
+            print(str(inputCode) + " is an invalid BLS Code.")
+            return False
+    else:
+        temp = tempDF["Code"].tolist()
+        if inputCode in temp:
+            return True
+        else:
+            print(str(inputCode) + " is an invalid NAPCS Code.")
+            return False
+
+def main():
+    blsORNAPCS = str(input("Is the code that you want to compare BLS or NAPCS? "))
+    while blsORNAPCS != "BLS" and blsORNAPCS != "NAPCS":
+        blsORNAPCS = str(input("Is the code that you want to compare BLS or NAPCS? "))
+
+    compareCode = str(input("Please enter the code here: "))
+    while getValidCodes(blsORNAPCS, compareCode) != True:
+        compareCode = str(input("Please enter the code here: "))
+
+    nearestAmount = input("Please enter the number of nearest matches that you would like to see here: ")
+    while nearestAmount.isdigit() != True:
+        nearestAmount = input("Please enter the number of nearest matches that you would like to see here: ")
+    nearestAmount = int(nearestAmount)
+    while nearestAmount < 0:
+        nearestAmount = input("Please enter the number of nearest matches that you would like to see here: ")
+        
+    if blsORNAPCS == "BLS":
+        display(nNearestBLStoNAPCS(compareCode, nearestAmount))
+    else:
+        display(nNearestNAPCStoBLS(compareCode, nearestAmount))
+
+
 def vectorStoragePathCreation():
     newPath = os.path.join(path,'RawData')
     # Checks if "newPath" exists and creates it if it doesn't
@@ -259,26 +298,25 @@ def prototypeMatch(entry,searchMethod):
             vectorResult = parseEntry(entry)
             tempDF["similarity"] = tempDF["vector"].apply(lambda x: 1 - spatial.distance.cosine(x, vectorResult))
             dataFrame = tempDF.sort_values(by="similarity", ascending=False)
-            dataFrame = dataFrame.head(20)
             dataFrame = dataFrame.drop(columns=["vector"])
-            dataFrame = dataFrame.reset_index(drop=True)
-            pd.set_option('display.max_colwidth', None)
-        filterLength = str(input("Would you like to filter the output based on the length of the code? (0 for No, 1 for Yes) "))
+        filterLength = str(input("Would you like to filter the output based on the length of the NAPCS code? (0 for No, 1 for Yes) "))
         while filterLength != "0" and filterLength != "1":
-            filterLength = str(input("Would you like to filter the output based on the length of the code? "))
+            filterLength = str(input("Would you like to filter the output based on the length of the NAPCS code? "))
         if filterLength == "1":
             lengthOfCode = str(input("How long are the codes? "))
             while lengthOfCode != "3" and lengthOfCode != "5" and lengthOfCode != "6" and lengthOfCode != "7":
                 lengthOfCode = str(input("How long are the codes? "))
             dataFrame = dataFrame[dataFrame.Code.str.len() == int(lengthOfCode)]
         # first digit bit
-        filterFirstNum = str(input("Would you like to filter the output based on the first digit of the code? (0 for No, 1 for Yes) "))
+        filterFirstNum = str(input("Would you like to filter the output based on the first digit of the NAPCS code? (0 for No, 1 for Yes) "))
         while filterFirstNum != "0" and filterFirstNum != "1":
-            filterFirstNum = str(input("Would you like to filter the output based on the first digit of the code? "))
+            filterFirstNum = str(input("Would you like to filter the output based on the first digit of the NAPCS code? "))
         if filterFirstNum == "1":
             firstDigit = str(input("What is the first digit to search for? "))
             dataFrame = dataFrame[dataFrame.Code.astype(str).str[:1] == firstDigit]
-        
+        dataFrame = dataFrame.head(20)
+        dataFrame = dataFrame.reset_index(drop=True)
+        pd.set_option('display.max_colwidth', None)
         return dataFrame
 
 vectorStoragePath = vectorStoragePathCreation()
@@ -288,12 +326,25 @@ blsDF = checkForBLS(vectorStoragePath)
 tempDF = checkForNAPCS(vectorStoragePath)
 while True:
     vectorSearchCode = ""
-    searchMethod = str(input("Would you like to search by an exact word? (1 for Yes, 0 for No):  "))
-    while searchMethod != "0" and searchMethod != "1":
-        searchMethod = str(input("Would you like to search by an exact word? (1 for Yes, 0 for No):  "))  
-    if searchMethod == "0":
+    print("MATCH METHODS:")
+    print("1. exact word search:")
+    print("2. string parser:")
+    print("3. search by code:")
+    searchMethod = str(input("Which match method would you like to use? "))
+    while searchMethod != "1" and searchMethod != "2" and searchMethod != "3":
+        print("MATCH METHODS:")
+        print("1. exact word search:")
+        print("2. string parser:")
+        print("3. search by code:")
+        searchMethod = str(input("Which match method would you like to use? "))
+    if searchMethod == "1":
+        display(prototypeMatch(vectorSearchCode,searchMethod))
+    elif searchMethod == "2":
         vectorSearchCode = str(input("Enter a string to parse? "))
-    display(prototypeMatch(vectorSearchCode,searchMethod))
+        display(prototypeMatch(vectorSearchCode,searchMethod))
+    elif searchMethod == "3":
+        main()
+
     compareAgain = str(input("Would you like to compare another code? (1 for Yes, 0 for No): "))
     while compareAgain != "1" and compareAgain != "0":
         compareAgain = str(input("Would you like to compare another code? (1 for Yes, 0 for No): "))
